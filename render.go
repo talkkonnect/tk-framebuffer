@@ -1,0 +1,410 @@
+package main
+
+import (
+	"fmt"
+	"image"
+	"image/color"
+	"image/draw"
+	"math"
+	"strings"
+	"time"
+)
+
+type ChannelUser struct {
+	Name   string
+	Status string // idle, speaking, whisper, mute
+}
+
+type DisplayState struct {
+	DeviceName   string
+	DeviceIP     string
+	ServerName   string
+	ServerIP     string
+	Channel      string
+	Users        []ChannelUser
+	UserCount    int
+	TXRXStatus   string
+	Mode         string
+	LastSpeaker  string
+	LastSpeakAgo string
+	Volume       int
+	Muted        bool
+	RTT          string
+	Activity     string
+	Receiving    bool
+	Connected    bool
+	Transmitting bool
+	Offline      bool
+	WiFiBars     int
+}
+
+var (
+	colBackground = color.RGBA{14, 14, 16, 255}
+	colPanel      = color.RGBA{24, 26, 30, 255}
+	colPanelHead  = color.RGBA{36, 42, 52, 255}
+	colPanelEdge  = color.RGBA{58, 72, 92, 255}
+	colBlue       = color.RGBA{72, 132, 196, 255}
+	colBlueDim    = color.RGBA{44, 68, 98, 255}
+	colGreyText   = color.RGBA{170, 174, 182, 255}
+	colWhite      = color.RGBA{236, 238, 242, 255}
+	colOrange     = color.RGBA{232, 118, 38, 255}
+	colRed        = color.RGBA{210, 55, 65, 255}
+	colGreen      = color.RGBA{62, 190, 98, 255}
+	colVUDim      = color.RGBA{20, 22, 26, 255}
+	colVUGreen    = color.RGBA{50, 170, 70, 255}
+	colVUYellow   = color.RGBA{210, 190, 60, 255}
+	colVURed      = color.RGBA{200, 55, 50, 255}
+)
+
+func fillRect(img draw.Image, r image.Rectangle, col color.Color) {
+	draw.Draw(img, r, &image.Uniform{col}, image.Point{}, draw.Src)
+}
+
+func strokeRect(img draw.Image, r image.Rectangle, col color.Color, w int) {
+	if w < 1 {
+		w = 1
+	}
+	for i := 0; i < w; i++ {
+		fillRect(img, image.Rect(r.Min.X, r.Min.Y+i, r.Max.X, r.Min.Y+i+1), col)
+		fillRect(img, image.Rect(r.Min.X, r.Max.Y-1-i, r.Max.X, r.Max.Y-i), col)
+		fillRect(img, image.Rect(r.Min.X+i, r.Min.Y, r.Min.X+i+1, r.Max.Y), col)
+		fillRect(img, image.Rect(r.Max.X-1-i, r.Min.Y, r.Max.X-i, r.Max.Y), col)
+	}
+}
+
+func drawPanel(img draw.Image, r image.Rectangle) {
+	fillRect(img, r, colPanel)
+	strokeRect(img, r, colPanelEdge, 1)
+}
+
+func drawColumnHeader(img draw.Image, r image.Rectangle, title string) {
+	fillRect(img, r, colPanelHead)
+	strokeRect(img, r, colBlue, 1)
+	drawText(img, r.Min.X+8, r.Min.Y+18, title, colBlue, sizeLabel)
+}
+
+func drawOutlinedButton(img draw.Image, r image.Rectangle, label string, active bool) {
+	c := colPanelEdge
+	if active {
+		c = colOrange
+	}
+	strokeRect(img, r, c, 2)
+	drawText(img, r.Min.X+10, r.Min.Y+(r.Dy()+12)/2, label, colGreyText, sizeLabel)
+}
+
+func drawWiFiBars(img draw.Image, x, y, h int, strength int) {
+	barW := 3
+	gap := 2
+	for i := 0; i < 4; i++ {
+		bh := h * (i + 1) / 4
+		bx := x + i*(barW+gap)
+		by := y + h - bh
+		c := colVUDim
+		if i < strength {
+			c = colGreen
+		}
+		fillRect(img, image.Rect(bx, by, bx+barW, y+h), c)
+	}
+}
+
+func userStatusColor(status string) color.Color {
+	switch status {
+	case "speaking":
+		return colOrange
+	case "whisper":
+		return colGreyText
+	case "mute":
+		return colRed
+	default:
+		return colGreyText
+	}
+}
+
+func drawUserIcon(img draw.Image, x, y int, status string) {
+	switch status {
+	case "speaking":
+		fillRect(img, image.Rect(x, y+4, x+10, y+6), colOrange)
+		fillRect(img, image.Rect(x+12, y+2, x+14, y+8), colOrange)
+	case "mute":
+		fillRect(img, image.Rect(x+2, y+2, x+8, y+10), colRed)
+		fillRect(img, image.Rect(x, y+10, x+12, y+12), colRed)
+	default:
+		fillRect(img, image.Rect(x+3, y+2, x+9, y+8), colGreyText)
+		fillRect(img, image.Rect(x+1, y+8, x+11, y+12), colGreyText)
+	}
+}
+
+func drawVerticalVU(img draw.Image, x, y, w, h int, leftLevel, rightLevel float64) {
+	segments := 20
+	gap := 2
+	segH := (h - gap*(segments-1)) / segments
+	if segH < 2 {
+		segH = 2
+	}
+	barW := (w - gap) / 2
+	drawText(img, x, y-2, "MIC / AF LEVEL", colGreyText, sizeSmall)
+
+	for i, lvl := range []float64{leftLevel, rightLevel} {
+		bx := x + i*(barW+gap)
+		track := image.Rect(bx, y+12, bx+barW, y+12+h)
+		fillRect(img, track, colVUDim)
+		strokeRect(img, track, colPanelEdge, 1)
+		lit := int(float64(segments) * lvl)
+		for s := 0; s < segments; s++ {
+			sy := y + 12 + h - (s+1)*(segH+gap)
+			segRect := image.Rect(bx+2, sy, bx+barW-2, sy+segH)
+			if s < lit {
+				p := float64(s+1) / float64(segments)
+				var c color.Color = colVUGreen
+				if p > 0.72 {
+					c = colVURed
+				} else if p > 0.5 {
+					c = colVUYellow
+				}
+				fillRect(img, segRect, c)
+			}
+		}
+	}
+}
+
+func drawVerticalVolume(img draw.Image, x, y, w, h int, volume int) {
+	drawText(img, x, y-2, "AF-VOLUME", colGreyText, sizeSmall)
+	track := image.Rect(x, y+12, x+w, y+12+h)
+	fillRect(img, track, colVUDim)
+	strokeRect(img, track, colBlueDim, 1)
+	knobY := y + 12 + h - int(float64(h-16)*float64(volume)/100.0) - 8
+	fillRect(img, image.Rect(x+2, y+12+2, x+w-2, y+12+h-10), colBlueDim)
+	fillRect(img, image.Rect(x-2, knobY, x+w+2, knobY+14), colWhite)
+	drawText(img, x+w+6, y+12+h-4, fmt.Sprintf("%d", volume), colWhite, sizeSmall)
+}
+
+func drawMuteButton(img draw.Image, r image.Rectangle, muted bool) {
+	c := colPanelEdge
+	if muted {
+		c = colRed
+	}
+	strokeRect(img, r, c, 2)
+	drawText(img, r.Min.X+12, r.Max.Y-12, "MUTE", colGreyText, sizeLabel)
+	cx := r.Min.X + r.Dx()/2
+	cy := r.Min.Y + r.Dy()/2 - 6
+	fillRect(img, image.Rect(cx-6, cy-8, cx+6, cy+4), colGreyText)
+	if muted {
+		fillRect(img, image.Rect(cx-8, cy-10, cx+8, cy-8), colRed)
+	}
+}
+
+type vuEngine struct {
+	left, right float64
+	phase       float64
+}
+
+func newVUEngine() *vuEngine {
+	return &vuEngine{left: 0.05, right: 0.05}
+}
+
+func (v *vuEngine) tick(st DisplayState) (left, right float64) {
+	if st.Receiving {
+		v.left, v.right = 1.0, 1.0
+		return v.left, v.right
+	}
+
+	switch st.Activity {
+	case "tx":
+		v.left, v.right = 0.88, 0.82
+	case "radio":
+		v.phase += 0.15
+		beat := (math.Sin(v.phase) + 1) / 2
+		v.left += (0.15+beat*0.5-v.left) * 0.35
+		v.right += (0.12+beat*0.45-v.right) * 0.35
+	default:
+		v.left, v.right = 0, 0
+	}
+	return v.left, v.right
+}
+
+func renderFrame(img draw.Image, width, height int, st DisplayState, vuLeft, vuRight float64, now time.Time) {
+	fillRect(img, img.Bounds(), colBackground)
+
+	headerH := 54
+	footerH := 34
+	margin := 6
+	gap := 6
+
+	// --- Header ---
+	fillRect(img, image.Rect(0, 0, width, headerH), colPanel)
+	strokeRect(img, image.Rect(0, 0, width, headerH), colPanelEdge, 1)
+
+	drawText(img, margin, 18, "DEVICE: "+st.DeviceName, colGreyText, sizeSmall)
+	drawText(img, margin, 34, "IP: "+st.DeviceIP, colGreyText, sizeSmall)
+
+	srvTitle := st.ServerName
+	if srvTitle == "" {
+		srvTitle = "Not Connected"
+	}
+	drawText(img, width/2-120, 18, "SERVER: "+srvTitle, colGreyText, sizeSmall)
+	drawText(img, width/2-120, 34, "IP: "+st.ServerIP, colGreyText, sizeSmall)
+
+	btnW, btnH := 90, 26
+	drawOutlinedButton(img, image.Rect(width-margin-btnW*2-gap, 12, width-margin-btnW-gap, 12+btnH), "PREV SERVER", false)
+	drawOutlinedButton(img, image.Rect(width-margin-btnW, 12, width-margin, 12+btnH), "NEXT SERVER", false)
+	drawWiFiBars(img, width-margin-24, 8, 14, st.WiFiBars)
+
+	// --- Main 3 columns ---
+	bodyTop := headerH + margin
+	bodyBottom := height - footerH - margin
+	colW := (width - margin*2 - gap*2) / 3
+	col1 := image.Rect(margin, bodyTop, margin+colW, bodyBottom)
+	col2 := image.Rect(margin+colW+gap, bodyTop, margin+colW*2+gap, bodyBottom)
+	col3 := image.Rect(margin+colW*2+gap*2, bodyTop, width-margin, bodyBottom)
+
+	// Left: CHANNELS
+	drawPanel(img, col1)
+	drawColumnHeader(img, image.Rect(col1.Min.X, col1.Min.Y, col1.Max.X, col1.Min.Y+24), "CHANNELS")
+	drawText(img, col1.Min.X+10, col1.Min.Y+70, "CHANNEL:", colBlue, sizeLabel)
+	channelName := st.Channel
+	if channelName == "" {
+		channelName = "—"
+	}
+	// Wrap long channel names
+	if len(channelName) > 16 {
+		drawText(img, col1.Min.X+10, col1.Min.Y+98, channelName, colWhite, sizeTitle)
+	} else {
+		drawText(img, col1.Min.X+10, col1.Min.Y+100, channelName, colWhite, sizeLarge)
+	}
+	btnY := col1.Max.Y - 44
+	drawOutlinedButton(img, image.Rect(col1.Min.X+8, btnY, col1.Min.X+colW/2-4, btnY+32), "CH UP", false)
+	drawOutlinedButton(img, image.Rect(col1.Min.X+colW/2+4, btnY, col1.Max.X-8, btnY+32), "CH DOWN", false)
+
+	// Middle: USERS IN CHANNEL
+	drawPanel(img, col2)
+	userTitle := fmt.Sprintf("USERS IN CHANNEL (%d)", st.UserCount)
+	drawColumnHeader(img, image.Rect(col2.Min.X, col2.Min.Y, col2.Max.X, col2.Min.Y+24), userTitle)
+	listTop := col2.Min.Y + 30
+	rowH := 22
+	maxRows := (col2.Dy() - 36) / rowH
+	if maxRows < 1 {
+		maxRows = 1
+	}
+	users := st.Users
+	if len(users) > maxRows {
+		users = users[:maxRows]
+	}
+	for i, u := range users {
+		y := listTop + i*rowH
+		drawUserIcon(img, col2.Min.X+10, y, u.Status)
+		line := u.Name + " [" + u.Status + "]"
+		drawText(img, col2.Min.X+28, y+14, line, userStatusColor(u.Status), sizeSmall)
+	}
+	if len(st.Users) > maxRows {
+		drawText(img, col2.Max.X-30, col2.Max.Y-10, "▼", colGreyText, sizeSmall)
+	}
+
+	// Right: STATUS & MODE
+	drawPanel(img, col3)
+	drawColumnHeader(img, image.Rect(col3.Min.X, col3.Min.Y, col3.Max.X, col3.Min.Y+24), "STATUS & MODE")
+
+	txrx := st.TXRXStatus
+	if txrx == "" {
+		txrx = "IDLE"
+	}
+	txCol := colGreen
+	if st.Transmitting {
+		txCol = colOrange
+	} else if st.Receiving {
+		txCol = colBlue
+	}
+	statusBox := image.Rect(col3.Min.X+8, col3.Min.Y+30, col3.Max.X-8, col3.Min.Y+58)
+	fillRect(img, statusBox, colVUDim)
+	strokeRect(img, statusBox, colPanelEdge, 1)
+	drawText(img, col3.Min.X+14, col3.Min.Y+52, "TX/RX: "+txrx, txCol, sizeBody)
+
+	modeY := col3.Min.Y + 66
+	drawOutlinedButton(img, image.Rect(col3.Min.X+8, modeY, col3.Min.X+col3.Dx()/2-2, modeY+28), "NORMAL MODE", st.Mode != "whisper")
+	drawOutlinedButton(img, image.Rect(col3.Min.X+col3.Dx()/2+2, modeY, col3.Max.X-8, modeY+28), "WHISPER MODE", st.Mode == "whisper")
+
+	drawText(img, col3.Min.X+10, modeY+48, "LAST SPEAKER:", colGreyText, sizeSmall)
+	speaker := st.LastSpeaker
+	if speaker == "" {
+		speaker = "—"
+	}
+	drawText(img, col3.Min.X+10, modeY+64, speaker, colWhite, sizeSmall)
+	drawText(img, col3.Min.X+10, modeY+82, "TIME AGO: "+st.LastSpeakAgo, colGreyText, sizeSmall)
+
+	audioTop := col3.Min.Y + 170
+	audioH := col3.Max.Y - audioTop - 8
+	vuW := col3.Dx()/3 - 4
+	drawVerticalVU(img, col3.Min.X+6, audioTop, vuW, audioH-20, vuLeft, vuRight)
+	drawVerticalVolume(img, col3.Min.X+col3.Dx()/3+4, audioTop, vuW, audioH-20, st.Volume)
+	muteR := image.Rect(col3.Max.X-vuW-8, audioTop+12, col3.Max.X-8, audioTop+audioH-8)
+	drawMuteButton(img, muteR, st.Muted)
+
+	// --- Footer ---
+	fillRect(img, image.Rect(0, height-footerH, width, height), colPanel)
+	strokeRect(img, image.Rect(0, height-footerH, width, height), colPanelEdge, 1)
+	drawText(img, margin, height-10, "talkkonnect", colWhite, sizeStation)
+	drawText(img, width/2-70, height-10, "www.talkkonnect.com", colGreyText, sizeSmall)
+	rtt := st.RTT
+	if rtt == "" {
+		rtt = "--"
+	}
+	drawText(img, width-margin-200, height-10, "RTT: "+rtt+"   SYSTEM TIME: "+now.Format("15:04:05"), colGreyText, sizeSmall)
+}
+
+func mockDisplayState() DisplayState {
+	return DisplayState{
+		DeviceName:  "TK-PI4-NODE",
+		DeviceIP:    "192.168.1.100",
+		ServerName:  "TalkKonnect Global Hub",
+		ServerIP:    "104.28.1.15",
+		Channel:     "ช่องสนทนาทั่วไป",
+		UserCount:   14,
+		Users: []ChannelUser{
+			{Name: "สมชาย", Status: "idle"},
+			{Name: "วิชัย", Status: "speaking"},
+			{Name: "User2", Status: "idle"},
+			{Name: "User3", Status: "idle"},
+			{Name: "User4", Status: "whisper"},
+			{Name: "User5", Status: "idle"},
+			{Name: "User6", Status: "idle"},
+			{Name: "User7", Status: "idle"},
+			{Name: "User8", Status: "idle"},
+			{Name: "User9", Status: "mute"},
+		},
+		TXRXStatus:   "IDLE",
+		Mode:         "normal",
+		LastSpeaker:  "วิชัย",
+		LastSpeakAgo: "08s",
+		Volume:       72,
+		Muted:        false,
+		RTT:          "18ms",
+		Activity:     "idle",
+		Connected:    true,
+		WiFiBars:     4,
+	}
+}
+
+func offlineDisplayState() DisplayState {
+	st := mockDisplayState()
+	st.DeviceIP = "—"
+	st.ServerName = "Offline"
+	st.ServerIP = "—"
+	st.Channel = "Not Connected"
+	st.Users = nil
+	st.UserCount = 0
+	st.TXRXStatus = "OFFLINE"
+	st.LastSpeaker = "—"
+	st.LastSpeakAgo = "—"
+	st.Offline = true
+	st.Connected = false
+	st.WiFiBars = 0
+	st.RTT = "--"
+	return st
+}
+
+func trimHost(server string) string {
+	server = strings.TrimSpace(server)
+	if i := strings.Index(server, ":"); i > 0 {
+		return server[:i]
+	}
+	return server
+}

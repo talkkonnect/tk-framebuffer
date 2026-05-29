@@ -1,0 +1,161 @@
+package main
+
+import (
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"os"
+	"strings"
+	"time"
+)
+
+type uiChannelUser struct {
+	Name   string `json:"name"`
+	Status string `json:"status"`
+	Self   bool   `json:"self"`
+}
+
+type talkkonnectStatus struct {
+	Connected     bool   `json:"connected"`
+	Transmitting  bool   `json:"transmitting"`
+	Server        string `json:"server"`
+	Channel       string `json:"channel"`
+	UsersOnline   int    `json:"usersOnline"`
+	ChannelUsers  []uiChannelUser `json:"channelUsers"`
+	Receiving     bool            `json:"receiving"`
+	LastSpeaker   string          `json:"lastSpeaker"`
+	RXVolume      int    `json:"rxVolume"`
+	Muted         bool   `json:"muted"`
+	InternetRadio struct {
+		Enabled      bool   `json:"enabled"`
+		Playing      bool   `json:"playing"`
+		Status       string `json:"status"`
+		StationName  string `json:"stationName"`
+		StationIndex int    `json:"stationIndex"`
+		StationCount int    `json:"stationCount"`
+		Volume       int    `json:"volume"`
+	} `json:"internetRadio"`
+	IPAddress string `json:"ipAddress"`
+	Bitrate   string `json:"bitrate"`
+	UptimeSec int64  `json:"uptimeSec"`
+	Activity  string `json:"activity"`
+}
+
+type talkkonnectClient struct {
+	url    string
+	client *http.Client
+}
+
+func newTalkkonnectClient(url string) *talkkonnectClient {
+	return &talkkonnectClient{
+		url: strings.TrimSpace(url),
+		client: &http.Client{
+			Timeout: 2 * time.Second,
+		},
+	}
+}
+
+func (c *talkkonnectClient) fetch() (talkkonnectStatus, error) {
+	var st talkkonnectStatus
+	resp, err := c.client.Get(c.url)
+	if err != nil {
+		return st, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return st, fmt.Errorf("talkkonnect status HTTP %d", resp.StatusCode)
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&st); err != nil {
+		return st, err
+	}
+	return st, nil
+}
+
+func (st talkkonnectStatus) toDisplayState(lastSpeakerAt time.Time) DisplayState {
+	hostname, _ := os.Hostname()
+	if hostname == "" {
+		hostname = "talkkonnect"
+	}
+
+	out := DisplayState{
+		DeviceName:   strings.ToUpper(hostname),
+		DeviceIP:     st.IPAddress,
+		ServerName:   trimHost(st.Server),
+		ServerIP:     st.Server,
+		Channel:      strings.ToUpper(st.Channel),
+		UserCount:    st.UsersOnline,
+		LastSpeaker:  st.LastSpeaker,
+		Volume:       st.RXVolume,
+		Activity:     st.Activity,
+		Receiving:    st.Receiving,
+		Connected:    st.Connected,
+		Transmitting: st.Transmitting,
+		Muted:        st.Muted,
+		WiFiBars:     4,
+		Mode:         "normal",
+		RTT:          "--",
+	}
+
+	if st.LastSpeaker != "" && !lastSpeakerAt.IsZero() {
+		sec := int(time.Since(lastSpeakerAt).Seconds())
+		if sec < 0 {
+			sec = 0
+		}
+		out.LastSpeakAgo = fmt.Sprintf("%02ds", sec)
+	} else {
+		out.LastSpeakAgo = "—"
+	}
+
+	switch {
+	case st.Transmitting:
+		out.TXRXStatus = "TX"
+		out.Activity = "tx"
+	case st.Receiving:
+		out.TXRXStatus = "RX"
+		out.Activity = "rx"
+	case st.Connected:
+		out.TXRXStatus = "IDLE"
+	default:
+		out.TXRXStatus = "OFFLINE"
+	}
+
+	if st.InternetRadio.Playing || (st.InternetRadio.Enabled && st.InternetRadio.Status == "ducking") {
+		out.Channel = strings.ToUpper(st.InternetRadio.StationName)
+		if out.Channel == "" {
+			out.Channel = "INTERNET RADIO"
+		}
+		out.ServerName = "Internet Radio"
+		out.Volume = st.InternetRadio.Volume
+		out.Activity = "radio"
+		if st.InternetRadio.Status == "playing" {
+			out.TXRXStatus = "STREAM"
+		}
+	}
+
+	out.Users = mapChannelUsers(st.ChannelUsers)
+	if len(out.Users) > 0 {
+		out.UserCount = len(out.Users)
+	} else {
+		out.UserCount = st.UsersOnline
+	}
+	return out
+}
+
+func mapChannelUsers(from []uiChannelUser) []ChannelUser {
+	if len(from) == 0 {
+		return nil
+	}
+	out := make([]ChannelUser, 0, len(from))
+	for _, u := range from {
+		name := strings.TrimSpace(u.Name)
+		if name == "" {
+			continue
+		}
+		status := u.Status
+		if status == "" {
+			status = "idle"
+		}
+		out = append(out, ChannelUser{Name: name, Status: status})
+	}
+	return out
+}
