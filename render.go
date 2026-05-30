@@ -233,22 +233,27 @@ func renderFrame(img draw.Image, width, height int, st DisplayState, signal floa
 	userTitle := fmt.Sprintf("Users In Current Channel (%d)", st.UserCount)
 	drawColumnHeader(img, image.Rect(col2.Min.X, col2.Min.Y, col2.Max.X, col2.Min.Y+24), userTitle)
 	listTop := col2.Min.Y + 30
-	rowH := 22
-	maxRows := (col2.Dy() - 36) / rowH
-	if maxRows < 1 {
-		maxRows = 1
-	}
+	listMaxY := col2.Max.Y - 10
 	users := st.Users
-	if len(users) > maxRows {
-		users = users[:maxRows]
-	}
-	for i, u := range users {
-		y := listTop + i*rowH
+	y := listTop
+	shown := 0
+	for _, u := range users {
+		rowH := 22
+		textSize := sizeSmall
+		if u.Status == "speaking" {
+			rowH = 28
+			textSize = sizeBody
+		}
+		if y+rowH > listMaxY {
+			break
+		}
 		drawUserIcon(img, col2.Min.X+10, y, u.Status)
 		line := u.Name + " [" + u.Status + "]"
-		drawText(img, col2.Min.X+28, y+14, line, userStatusColor(u.Status), sizeSmall)
+		drawText(img, col2.Min.X+28, y+rowH-8, line, userStatusColor(u.Status), textSize)
+		y += rowH
+		shown++
 	}
-	if len(st.Users) > maxRows {
+	if len(st.Users) > shown {
 		drawText(img, col2.Max.X-30, col2.Max.Y-10, "▼", colGreyText, sizeSmall)
 	}
 
