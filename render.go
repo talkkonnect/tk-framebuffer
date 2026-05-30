@@ -96,11 +96,11 @@ func drawOutlinedButton(img draw.Image, r image.Rectangle, label string, active 
 
 func userStatusColor(status string) color.Color {
 	switch status {
-	case "speaking":
+	case "Speaking":
 		return colGreen
 	case "whisper":
 		return colGreyText
-	case "mute":
+	case "Muted":
 		return colRed
 	default:
 		return colGreyText
@@ -109,9 +109,9 @@ func userStatusColor(status string) color.Color {
 
 func drawUserIcon(img draw.Image, x, y int, status string) {
 	switch status {
-	case "speaking":
+	case "Speaking":
 		fillRect(img, image.Rect(x+2, y+5, x+9, y+15), colGreen)
-	case "mute":
+	case "Muted":
 		fillRect(img, image.Rect(x+2, y+5, x+9, y+15), colRed)
 	default:
 		fillRect(img, image.Rect(x+2, y+5, x+9, y+15), colPanel)
@@ -240,7 +240,7 @@ func renderFrame(img draw.Image, width, height int, st DisplayState, signal floa
 	for _, u := range users {
 		rowH := 22
 		textSize := sizeSmall
-		if u.Status == "speaking" {
+		if u.Status == "Speaking" {
 			rowH = 28
 			textSize = sizeBody
 		}
@@ -334,7 +334,7 @@ func mockDisplayState() DisplayState {
 		UserCount: 14,
 		Users: []ChannelUser{
 			{Name: "Suvir", Status: "idle"},
-			{Name: "Zoran", Status: "speaking"},
+			{Name: "Zoran", Status: "Speaking"},
 			{Name: "Panajon", Status: "idle"},
 			{Name: "mtech", Status: "idle"},
 			{Name: "User4", Status: "whisper"},
@@ -342,7 +342,7 @@ func mockDisplayState() DisplayState {
 			{Name: "User6", Status: "idle"},
 			{Name: "User7", Status: "idle"},
 			{Name: "User8", Status: "idle"},
-			{Name: "User9", Status: "mute"},
+			{Name: "User9", Status: "Muted"},
 		},
 		TXRXStatus:  "STANDBY",
 		Mode:        "normal",
