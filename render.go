@@ -307,7 +307,7 @@ func renderFrame(img draw.Image, width, height int, st DisplayState, signal floa
 	logoRect := image.Rect(margin, height-footerH+4, margin+140, height-4)
 	drawBrandLogo(img, logoRect)
 	footerText := "Web: www.talkkonnect.com Facebook: www.facebook.com/talkkonnect Email: suvir@talkkonnect.com"
-	drawText(img, 110, height-8, footerText, colGreyText, sizeSmall)
+	drawText(img, 50, height-8, footerText, colVUYellow, sizeLabel)
 	drawText(img, width-margin-125, height-8,now.Format(time.ANSIC), colGreyText, sizeSmall)
 }
 
