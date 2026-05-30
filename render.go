@@ -26,7 +26,8 @@ type DisplayState struct {
 	TXRXStatus   string
 	Mode         string
 	LastSpeaker  string
-	Elapsed      string
+	Elapsed         string
+	ActivityEndTime string // wall-clock time when last TX or RX session ended
 	Volume       int
 	Muted        bool
 	RTT          string
@@ -251,7 +252,7 @@ func renderFrame(img draw.Image, width, height int, st DisplayState, signal floa
 
 	// Right: STATUS & MODE
 	drawPanel(img, col3)
-	drawColumnHeader(img, image.Rect(col3.Min.X, col3.Min.Y, col3.Max.X, col3.Min.Y+24), "Activity Statys & Receiving Mode")
+	drawColumnHeader(img, image.Rect(col3.Min.X, col3.Min.Y, col3.Max.X, col3.Min.Y+24), "Activity Status & Communication Mode")
 
 	txrx := st.TXRXStatus
 	if txrx == "" {
@@ -273,8 +274,8 @@ func renderFrame(img draw.Image, width, height int, st DisplayState, signal floa
 	drawText(img, col3.Min.X+14, col3.Min.Y+52, ""+txrx, txCol, sizeBody)
 
 	modeY := col3.Min.Y + 66
-	drawOutlinedButton(img, image.Rect(col3.Min.X+8, modeY, col3.Min.X+col3.Dx()/2-2, modeY+28), "NORMAL", st.Mode != "whisper")
-	drawOutlinedButton(img, image.Rect(col3.Min.X+col3.Dx()/2+2, modeY, col3.Max.X-8, modeY+28), "WHISPER", st.Mode == "whisper")
+	drawOutlinedButton(img, image.Rect(col3.Min.X+8, modeY, col3.Min.X+col3.Dx()/2-2, modeY+28), "Normal", st.Mode != "whisper")
+	drawOutlinedButton(img, image.Rect(col3.Min.X+col3.Dx()/2+2, modeY, col3.Max.X-8, modeY+28), "Whisper", st.Mode == "whisper")
 	speaker := st.LastSpeaker
 	if speaker == "" {
 		speaker = " "
@@ -285,7 +286,11 @@ func renderFrame(img draw.Image, width, height int, st DisplayState, signal floa
 		elapsed = "00s"
 	}
 	drawText(img, col3.Min.X+10, modeY+64, "Elapsed  : "+elapsed, colGreyText, sizeLabel)
-	drawText(img, col3.Min.X+10, modeY+80, "Activity  : "+elapsed, colGreyText, sizeLabel)
+	activityEnd := st.ActivityEndTime
+	if activityEnd == "" {
+		activityEnd = "—"
+	}
+	drawText(img, col3.Min.X+10, modeY+80, "Activity  : "+activityEnd, colGreyText, sizeLabel)
 
 	audioTop := col3.Min.Y + 170
 	audioH := col3.Max.Y - audioTop - 8
@@ -334,8 +339,9 @@ func mockDisplayState() DisplayState {
 		},
 		TXRXStatus:  "STANDBY",
 		Mode:        "normal",
-		LastSpeaker: "วิชัย",
-		Elapsed:     "08s",
+		LastSpeaker: "suvir",
+		Elapsed:         "08s",
+		ActivityEndTime: "14:32:05",
 		Volume:      72,
 		Muted:       false,
 		RTT:         "18ms",
@@ -357,6 +363,7 @@ func offlineDisplayState() DisplayState {
 	st.TXRXStatus = "OFFLINE"
 	st.LastSpeaker = "—"
 	st.Elapsed = "00s"
+	st.ActivityEndTime = ""
 	st.Offline = true
 	st.Connected = false
 	st.MumbleUsername = ""

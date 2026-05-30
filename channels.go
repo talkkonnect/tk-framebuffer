@@ -56,7 +56,7 @@ func drawChannelTree(img draw.Image, panel image.Rectangle, nodes []ChannelTreeN
 		if y > maxY {
 			return
 		}
-		drawText(img, x, y+13, channelDisplayName(active.Name), colWhite, sizeChannelActive)
+		drawText(img, x, y+13, channelDisplayName(active.Name), colGreen, sizeChannelActive)
 		y += activeRowH
 	}
 

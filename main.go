@@ -74,7 +74,7 @@ func main() {
 			}
 		}
 
-		display.Elapsed = elapsed.update(now, display.Transmitting, display.Receiving)
+		display.Elapsed, display.ActivityEndTime = elapsed.update(now, display.Transmitting, display.Receiving)
 
 		renderFrame(frame, fb.width, fb.height, display, signalLevel(display), now)
 		if err := fb.blitRGBA(frame); err != nil {

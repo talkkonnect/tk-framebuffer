@@ -5,16 +5,18 @@ import (
 	"time"
 )
 
-// elapsedTracker drives the "Elapsed :" display for active TX/RX sessions.
-// It uses only timestamps and edge flags — no time.Timer, time.Ticker, or goroutines.
+// elapsedTracker drives Elapsed (live TX/RX duration) and ActivityEndTime (wall clock at last end).
+// Uses only timestamps and edge flags — no time.Timer, time.Ticker, or goroutines.
 type elapsedTracker struct {
-	txStart time.Time
-	rxStart time.Time
-	wasTX   bool
-	wasRX   bool
+	txStart   time.Time
+	rxStart   time.Time
+	txEndedAt time.Time
+	rxEndedAt time.Time
+	wasTX     bool
+	wasRX     bool
 }
 
-func (t *elapsedTracker) update(now time.Time, transmitting, receiving bool) string {
+func (t *elapsedTracker) update(now time.Time, transmitting, receiving bool) (elapsed, activityEndTime string) {
 	if transmitting && !t.wasTX {
 		t.txStart = now
 	}
@@ -22,9 +24,11 @@ func (t *elapsedTracker) update(now time.Time, transmitting, receiving bool) str
 		t.rxStart = now
 	}
 	if t.wasRX && !receiving {
+		t.rxEndedAt = now
 		t.rxStart = time.Time{}
 	}
 	if t.wasTX && !transmitting {
+		t.txEndedAt = now
 		t.txStart = time.Time{}
 	}
 
@@ -33,11 +37,35 @@ func (t *elapsedTracker) update(now time.Time, transmitting, receiving bool) str
 
 	switch {
 	case transmitting && !t.txStart.IsZero():
-		return formatElapsed(now.Sub(t.txStart))
+		elapsed = formatElapsed(now.Sub(t.txStart))
 	case receiving && !t.rxStart.IsZero():
-		return formatElapsed(now.Sub(t.rxStart))
+		elapsed = formatElapsed(now.Sub(t.rxStart))
 	default:
-		return "00s"
+		elapsed = "00s"
+	}
+
+	activityEndTime = formatActivityEndTime(t.txEndedAt, t.rxEndedAt)
+	return elapsed, activityEndTime
+}
+
+func formatActivityEndTime(txEnded, rxEnded time.Time) string {
+	endAt := latestTime(txEnded, rxEnded)
+	if endAt.IsZero() {
+		return "—"
+	}
+	return endAt.Format("15:04:05")
+}
+
+func latestTime(a, b time.Time) time.Time {
+	switch {
+	case a.IsZero():
+		return b
+	case b.IsZero():
+		return a
+	case a.After(b):
+		return a
+	default:
+		return b
 	}
 }
 
