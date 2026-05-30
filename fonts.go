@@ -205,6 +205,16 @@ func drawText(img draw.Image, x, y int, text string, col color.Color, size fontS
 	}
 }
 
+// drawTextRight aligns the right edge of text with rightX (baseline y).
+func drawTextRight(img draw.Image, rightX, y int, text string, col color.Color, size fontSize) {
+	if text == "" {
+		return
+	}
+	f := faceFor(size, stringNeedsThai(text))
+	w := font.MeasureString(f, text).Ceil()
+	drawText(img, rightX-w, y, text, col, size)
+}
+
 // drawTextCentered places a single-line label in the horizontal and vertical center of r.
 func drawTextCentered(img draw.Image, r image.Rectangle, text string, col color.Color, size fontSize) {
 	if text == "" {

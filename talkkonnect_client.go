@@ -46,7 +46,8 @@ type talkkonnectStatus struct {
 	IPAddress string `json:"ipAddress"`
 	Bitrate   string `json:"bitrate"`
 	UptimeSec int64  `json:"uptimeSec"`
-	Activity  string `json:"activity"`
+	Activity       string `json:"activity"`
+	MumbleUsername string `json:"mumbleUsername"`
 }
 
 type talkkonnectClient struct {
@@ -98,9 +99,10 @@ func (st talkkonnectStatus) toDisplayState() DisplayState {
 		Receiving:    st.Receiving,
 		Connected:    st.Connected,
 		Transmitting: st.Transmitting,
-		Muted:        st.Muted,
-		Mode:         "normal",
-		RTT:          "--",
+		Muted:          st.Muted,
+		MumbleUsername: strings.TrimSpace(st.MumbleUsername),
+		Mode:           "normal",
+		RTT:            "--",
 	}
 
 	switch {

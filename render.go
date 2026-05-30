@@ -34,10 +34,12 @@ type DisplayState struct {
 	Receiving    bool
 	Connected    bool
 	Transmitting bool
-	Offline      bool
+	Offline        bool
+	MumbleUsername string
 }
 
 var (
+	colBlack = color.RGBA{0, 0, 0, 255}
 	colBackground = color.RGBA{14, 14, 16, 255}
 	colPanel      = color.RGBA{24, 26, 30, 255}
 	colPanelHead  = color.RGBA{36, 42, 52, 255}
@@ -94,7 +96,7 @@ func drawOutlinedButton(img draw.Image, r image.Rectangle, label string, active 
 func userStatusColor(status string) color.Color {
 	switch status {
 	case "speaking":
-		return colOrange
+		return colGreen
 	case "whisper":
 		return colGreyText
 	case "mute":
@@ -107,14 +109,11 @@ func userStatusColor(status string) color.Color {
 func drawUserIcon(img draw.Image, x, y int, status string) {
 	switch status {
 	case "speaking":
-		fillRect(img, image.Rect(x, y+4, x+10, y+6), colOrange)
-		fillRect(img, image.Rect(x+12, y+2, x+14, y+8), colOrange)
+		fillRect(img, image.Rect(x+2, y+5, x+9, y+15), colGreen)
 	case "mute":
-		fillRect(img, image.Rect(x+2, y+2, x+8, y+10), colRed)
-		fillRect(img, image.Rect(x, y+10, x+12, y+12), colRed)
+		fillRect(img, image.Rect(x+2, y+5, x+9, y+15), colRed)
 	default:
-		fillRect(img, image.Rect(x+3, y+2, x+9, y+8), colGreyText)
-		fillRect(img, image.Rect(x+1, y+8, x+11, y+12), colGreyText)
+		fillRect(img, image.Rect(x+2, y+5, x+9, y+15), colPanel)
 	}
 }
 
@@ -125,7 +124,7 @@ func drawSignalBar(img draw.Image, x, y, w, h int, level float64) {
 	if segH < 2 {
 		segH = 2
 	}
-	drawText(img, x, y-2, "Activity", colGreyText, sizeSmall)
+	drawText(img, x+12, y+8, "Activity Bar", colGreyText, sizeSmall)
 	track := image.Rect(x, y+12, x+w, y+12+h)
 	fillRect(img, track, colVUDim)
 	strokeRect(img, track, colPanelEdge, 1)
@@ -150,21 +149,19 @@ func drawSignalBar(img draw.Image, x, y, w, h int, level float64) {
 }
 
 func drawVerticalVolume(img draw.Image, x, y, w, h int, volume int) {
-	drawText(img, x, y-2, "RX Volume", colGreyText, sizeSmall)
+	drawText(img, x+12, y+8, "RX Volume", colGreyText, sizeSmall)
 	track := image.Rect(x, y+12, x+w, y+12+h)
 	fillRect(img, track, colVUDim)
 	strokeRect(img, track, colBlueDim, 1)
 	knobY := y + 12 + h - int(float64(h-16)*float64(volume)/100.0) - 8
-	fillRect(img, image.Rect(x+2, y+12+2, x+w-2, y+12+h-10), colBlueDim)
-	fillRect(img, image.Rect(x-2, knobY, x+w+2, knobY+14), colRed)
-	drawText(img, x+4, y+12+h-18, fmt.Sprintf("%d", volume), colWhite, sizeBody)
+	fillRect(img, image.Rect(x+2, knobY, x+w-2, knobY+8), colRed)
+	drawText(img, x+25, y+12+h+12, fmt.Sprintf("%d", volume), colWhite, sizeBody)
 }
-
 func muteBoxCaption(muted bool) string {
 	if muted {
 		return "MUTED"
 	}
-	return "UN-MUTED"
+	return "ACTIVE"
 }
 
 func drawMuteButton(img draw.Image, r image.Rectangle, muted bool) {
@@ -175,7 +172,7 @@ func drawMuteButton(img draw.Image, r image.Rectangle, muted bool) {
 	fillRect(img, r, bg)
 	strokeRect(img, r, colPanelEdge, 1)
 	caption := muteBoxCaption(muted)
-	drawTextCentered(img, r, caption, colWhite, sizeBody)
+	drawTextCentered(img, r, caption, colBlack, sizeBody)
 }
 
 func renderFrame(img draw.Image, width, height int, st DisplayState, signal float64, now time.Time) {
@@ -190,15 +187,21 @@ func renderFrame(img draw.Image, width, height int, st DisplayState, signal floa
 	fillRect(img, image.Rect(0, 0, width, headerH), colPanel)
 	strokeRect(img, image.Rect(0, 0, width, headerH), colPanelEdge, 1)
 
-	drawText(img, margin, 18, "DEVICE: "+st.DeviceName, colGreyText, sizeSmall)
-	drawText(img, margin, 34, "IP: "+st.DeviceIP, colGreyText, sizeSmall)
+	drawText(img, margin, 18, "DEVICE: "+st.DeviceName, colGreyText, sizeLabel)
+	drawText(img, margin, 36, "IP: "+st.DeviceIP, colGreyText, sizeLabel)
 
 	srvTitle := st.ServerName
 	if srvTitle == "" {
 		srvTitle = "Not Connected"
 	}
-	drawText(img, width/2-120, 18, "SERVER: "+srvTitle, colGreyText, sizeSmall)
-	drawText(img, width/2-120, 34, "IP: "+st.ServerIP, colGreyText, sizeSmall)
+	drawText(img, width/2-120, 18, "SERVER: "+srvTitle, colGreyText, sizeLabel)
+	drawText(img, width/2-120, 36, "IP: "+st.ServerIP, colGreyText, sizeLabel)
+
+	mumbleUser := strings.TrimSpace(st.MumbleUsername)
+	if mumbleUser == "" {
+		mumbleUser = "—"
+	}
+	drawTextRight(img, width-margin, 18, "USER: "+mumbleUser, colWhite, sizeLabel)
 
 	// --- Main 3 columns ---
 	bodyTop := headerH + margin
@@ -210,7 +213,7 @@ func renderFrame(img draw.Image, width, height int, st DisplayState, signal floa
 
 	// Left: CHANNELS (tree)
 	drawPanel(img, col1)
-	drawColumnHeader(img, image.Rect(col1.Min.X, col1.Min.Y, col1.Max.X, col1.Min.Y+24), "CHANNELS")
+	drawColumnHeader(img, image.Rect(col1.Min.X, col1.Min.Y, col1.Max.X, col1.Min.Y+24), "Channel List")
 	tree := st.ChannelTree
 	if len(tree) == 0 && st.Channel != "" {
 		tree = []ChannelTreeNode{{
@@ -224,7 +227,7 @@ func renderFrame(img draw.Image, width, height int, st DisplayState, signal floa
 
 	// Middle: USERS IN CHANNEL
 	drawPanel(img, col2)
-	userTitle := fmt.Sprintf("USERS IN CHANNEL (%d)", st.UserCount)
+	userTitle := fmt.Sprintf("Users In Current Channel (%d)", st.UserCount)
 	drawColumnHeader(img, image.Rect(col2.Min.X, col2.Min.Y, col2.Max.X, col2.Min.Y+24), userTitle)
 	listTop := col2.Min.Y + 30
 	rowH := 22
@@ -248,7 +251,7 @@ func renderFrame(img draw.Image, width, height int, st DisplayState, signal floa
 
 	// Right: STATUS & MODE
 	drawPanel(img, col3)
-	drawColumnHeader(img, image.Rect(col3.Min.X, col3.Min.Y, col3.Max.X, col3.Min.Y+24), "STATUS & MODE")
+	drawColumnHeader(img, image.Rect(col3.Min.X, col3.Min.Y, col3.Max.X, col3.Min.Y+24), "Activity Statys & Receiving Mode")
 
 	txrx := st.TXRXStatus
 	if txrx == "" {
@@ -270,27 +273,27 @@ func renderFrame(img draw.Image, width, height int, st DisplayState, signal floa
 	drawText(img, col3.Min.X+14, col3.Min.Y+52, ""+txrx, txCol, sizeBody)
 
 	modeY := col3.Min.Y + 66
-	drawOutlinedButton(img, image.Rect(col3.Min.X+8, modeY, col3.Min.X+col3.Dx()/2-2, modeY+28), "NORMAL MODE", st.Mode != "whisper")
-	drawOutlinedButton(img, image.Rect(col3.Min.X+col3.Dx()/2+2, modeY, col3.Max.X-8, modeY+28), "WHISPER MODE", st.Mode == "whisper")
-	//svuir
+	drawOutlinedButton(img, image.Rect(col3.Min.X+8, modeY, col3.Min.X+col3.Dx()/2-2, modeY+28), "NORMAL", st.Mode != "whisper")
+	drawOutlinedButton(img, image.Rect(col3.Min.X+col3.Dx()/2+2, modeY, col3.Max.X-8, modeY+28), "WHISPER", st.Mode == "whisper")
 	speaker := st.LastSpeaker
 	if speaker == "" {
 		speaker = " "
 	}
 	drawText(img, col3.Min.X+10, modeY+48, "Speaker: "+speaker, colGreyText, sizeLabel)
-	//drawText(img, col3.Min.X+10, modeY+64, speaker, colWhite, sizeSmall)
 	elapsed := st.Elapsed
 	if elapsed == "" {
 		elapsed = "00s"
 	}
-	drawText(img, col3.Min.X+10, modeY+70, "Elapsed : "+elapsed, colGreyText, sizeSmall)
+	drawText(img, col3.Min.X+10, modeY+64, "Elapsed  : "+elapsed, colGreyText, sizeLabel)
+	drawText(img, col3.Min.X+10, modeY+80, "Activity  : "+elapsed, colGreyText, sizeLabel)
 
 	audioTop := col3.Min.Y + 170
 	audioH := col3.Max.Y - audioTop - 8
 	barW := col3.Dx()/3 - 4
+	//suvir fix box sizes here
 	drawSignalBar(img, col3.Min.X+6, audioTop, barW, audioH-20, signal)
 	drawVerticalVolume(img, col3.Min.X+col3.Dx()/3+4, audioTop, barW, audioH-20, st.Volume)
-	muteR := image.Rect(col3.Max.X-barW-8, audioTop+12, col3.Max.X-8, audioTop+audioH-8)
+	muteR := image.Rect(col3.Max.X-barW-2, audioTop+12, col3.Max.X-8, audioTop+audioH-8)
 	drawMuteButton(img, muteR, st.Muted)
 
 	// --- Footer ---
@@ -298,22 +301,18 @@ func renderFrame(img draw.Image, width, height int, st DisplayState, signal floa
 	strokeRect(img, image.Rect(0, height-footerH, width, height), colPanelEdge, 1)
 	logoRect := image.Rect(margin, height-footerH+4, margin+140, height-4)
 	drawBrandLogo(img, logoRect)
-	footerText := "www.talkkonnect.com  by <suvir@talkkonnect.com>"
-	drawText(img, width/2-200, height-8, footerText, colGreyText, sizeLabel)
-	rtt := st.RTT
-	if rtt == "" {
-		rtt = "--"
-	}
-	drawText(img, width-margin-200, height-10, "RTT: "+rtt+"   SYSTEM TIME: "+now.Format("15:04:05"), colGreyText, sizeSmall)
+	footerText := "Web: www.talkkonnect.com Facebook: www.facebook.com/talkkonnect Email: suvir@talkkonnect.com"
+	drawText(img, 110, height-8, footerText, colGreyText, sizeSmall)
+	drawText(img, width-margin-125, height-8,now.Format(time.ANSIC), colGreyText, sizeSmall)
 }
 
 func mockDisplayState() DisplayState {
 	return DisplayState{
 		DeviceName: "TK-PI4-NODE",
-		DeviceIP:   "192.168.1.100",
-		ServerName: "TalkKonnect Global Hub",
-		ServerIP:   "104.28.1.15",
-		Channel:    "ช่องสนทนาทั่วไป",
+		DeviceIP:   "192.168.1.1",
+		ServerName: "mumble.talkkonnect.com",
+		ServerIP:   "111.223.36.158",
+		Channel:    "HAM-CB",
 		ChannelTree: []ChannelTreeNode{
 			{Name: "Root", Depth: 0, UserCount: 0, Active: false},
 			{Name: "General", Depth: 1, UserCount: 14, Active: true},
@@ -322,10 +321,10 @@ func mockDisplayState() DisplayState {
 		},
 		UserCount: 14,
 		Users: []ChannelUser{
-			{Name: "สมชาย", Status: "idle"},
-			{Name: "วิชัย", Status: "speaking"},
-			{Name: "User2", Status: "idle"},
-			{Name: "User3", Status: "idle"},
+			{Name: "Suvir", Status: "idle"},
+			{Name: "Zoran", Status: "speaking"},
+			{Name: "Panajon", Status: "idle"},
+			{Name: "mtech", Status: "idle"},
 			{Name: "User4", Status: "whisper"},
 			{Name: "User5", Status: "idle"},
 			{Name: "User6", Status: "idle"},
@@ -340,8 +339,9 @@ func mockDisplayState() DisplayState {
 		Volume:      72,
 		Muted:       false,
 		RTT:         "18ms",
-		Activity:    "idle",
-		Connected:   true,
+		Activity:       "idle",
+		Connected:      true,
+		MumbleUsername: "talkkonnect-demo",
 	}
 }
 
@@ -359,6 +359,7 @@ func offlineDisplayState() DisplayState {
 	st.Elapsed = "00s"
 	st.Offline = true
 	st.Connected = false
+	st.MumbleUsername = ""
 	st.RTT = "--"
 	return st
 }
