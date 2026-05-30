@@ -61,8 +61,10 @@ func main() {
 
 	for now := range ticker.C {
 		display := mockDisplayState()
+		talkkonnectOK := *mockMode
 		if tk != nil {
 			st, err := tk.fetch()
+			talkkonnectOK = err == nil
 			if err != nil {
 				if time.Since(lastErr) > 5*time.Second {
 					fmt.Printf("talkkonnect status error: %v\n", err)
@@ -76,7 +78,7 @@ func main() {
 
 		display.Elapsed, display.ActivityEndTime = elapsed.update(now, display.Transmitting, display.Receiving)
 
-		renderFrame(frame, fb.width, fb.height, display, signalLevel(display), now)
+		renderFrame(frame, fb.width, fb.height, display, signalLevel(display), talkkonnectOK, now)
 		if err := fb.blitRGBA(frame); err != nil {
 			fmt.Printf("framebuffer blit error: %v\n", err)
 		}

@@ -176,7 +176,7 @@ func drawMuteButton(img draw.Image, r image.Rectangle, muted bool) {
 	drawTextCentered(img, r, caption, colBlack, sizeBody)
 }
 
-func renderFrame(img draw.Image, width, height int, st DisplayState, signal float64, now time.Time) {
+func renderFrame(img draw.Image, width, height int, st DisplayState, signal float64, talkkonnectOK bool, now time.Time) {
 	fillRect(img, img.Bounds(), colBackground)
 
 	headerH := 54
@@ -202,7 +202,9 @@ func renderFrame(img draw.Image, width, height int, st DisplayState, signal floa
 	if mumbleUser == "" {
 		mumbleUser = "—"
 	}
-	drawTextRight(img, width-margin, 18, "USER: "+mumbleUser, colWhite, sizeLabel)
+	userLine := "USER: " + mumbleUser
+	drawTextRight(img, width-margin, 18, userLine, colWhite, sizeLabel)
+	drawTalkkonnectStatusLED(img, width, margin, talkkonnectOK, now)
 
 	// --- Main 3 columns ---
 	bodyTop := headerH + margin
