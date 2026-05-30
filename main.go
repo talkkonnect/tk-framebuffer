@@ -10,6 +10,7 @@ import (
 
 func main() {
 	talkkonnectURL := flag.String("talkkonnect", "http://127.0.0.1:8080/uistatus", "talkkonnect /uistatus JSON endpoint")
+	logoPath := flag.String("logo", "talkkonnect-logo.png", "talkkonnect brand logo PNG for footer")
 	mockMode := flag.Bool("mock", false, "run with demo data instead of talkkonnect")
 	fbDevice := flag.String("fb", "/dev/fb0", "Linux framebuffer device")
 	fontPath := flag.String("font", "DejaVuSans.ttf", "Latin font (DejaVu Sans)")
@@ -33,13 +34,13 @@ func main() {
 	}
 
 	initFonts(*fontPath, *thaiFontPath)
+	initBrandLogo(*logoPath)
 
 	var tk *talkkonnectClient
 	if !*mockMode {
 		tk = newTalkkonnectClient(*talkkonnectURL)
 	}
 
-	vu := newVUEngine()
 	frame := image.NewRGBA(image.Rect(0, 0, fb.width, fb.height))
 
 	fmt.Printf("talKKonnect framebuffer UI active on %s (%dx%d, stride=%d). Press Ctrl+C to stop.\n",
@@ -50,12 +51,12 @@ func main() {
 		fmt.Printf("Polling talkkonnect at %s\n", *talkkonnectURL)
 	}
 
+	// Single frame ticker; stopped on exit via defer (no extra Timer/Ticker instances).
 	ticker := time.NewTicker(100 * time.Millisecond)
 	defer ticker.Stop()
 
 	var lastErr time.Time
-	var lastSpeaker string
-	var lastSpeakerAt time.Time
+	var elapsed elapsedTracker
 	frameNum := 0
 
 	for now := range ticker.C {
@@ -69,16 +70,13 @@ func main() {
 				}
 				display = offlineDisplayState()
 			} else {
-				if st.LastSpeaker != "" && st.LastSpeaker != lastSpeaker {
-					lastSpeaker = st.LastSpeaker
-					lastSpeakerAt = now
-				}
-				display = st.toDisplayState(lastSpeakerAt)
+				display = st.toDisplayState()
 			}
 		}
 
-		vuLeft, vuRight := vu.tick(display)
-		renderFrame(frame, fb.width, fb.height, display, vuLeft, vuRight, now)
+		display.Elapsed = elapsed.update(now, display.Transmitting, display.Receiving)
+
+		renderFrame(frame, fb.width, fb.height, display, signalLevel(display), now)
 		if err := fb.blitRGBA(frame); err != nil {
 			fmt.Printf("framebuffer blit error: %v\n", err)
 		}

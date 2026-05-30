@@ -15,17 +15,25 @@ type uiChannelUser struct {
 	Self   bool   `json:"self"`
 }
 
+type uiChannelNode struct {
+	Name      string `json:"name"`
+	Depth     int    `json:"depth"`
+	UserCount int    `json:"userCount"`
+	Active    bool   `json:"active"`
+}
+
 type talkkonnectStatus struct {
-	Connected     bool   `json:"connected"`
-	Transmitting  bool   `json:"transmitting"`
-	Server        string `json:"server"`
-	Channel       string `json:"channel"`
-	UsersOnline   int    `json:"usersOnline"`
+	Connected     bool            `json:"connected"`
+	Transmitting  bool            `json:"transmitting"`
+	Server        string          `json:"server"`
+	Channel       string          `json:"channel"`
+	UsersOnline   int             `json:"usersOnline"`
 	ChannelUsers  []uiChannelUser `json:"channelUsers"`
+	ChannelTree   []uiChannelNode `json:"channelTree"`
 	Receiving     bool            `json:"receiving"`
 	LastSpeaker   string          `json:"lastSpeaker"`
-	RXVolume      int    `json:"rxVolume"`
-	Muted         bool   `json:"muted"`
+	RXVolume      int             `json:"rxVolume"`
+	Muted         bool            `json:"muted"`
 	InternetRadio struct {
 		Enabled      bool   `json:"enabled"`
 		Playing      bool   `json:"playing"`
@@ -71,7 +79,7 @@ func (c *talkkonnectClient) fetch() (talkkonnectStatus, error) {
 	return st, nil
 }
 
-func (st talkkonnectStatus) toDisplayState(lastSpeakerAt time.Time) DisplayState {
+func (st talkkonnectStatus) toDisplayState() DisplayState {
 	hostname, _ := os.Hostname()
 	if hostname == "" {
 		hostname = "talkkonnect"
@@ -91,19 +99,8 @@ func (st talkkonnectStatus) toDisplayState(lastSpeakerAt time.Time) DisplayState
 		Connected:    st.Connected,
 		Transmitting: st.Transmitting,
 		Muted:        st.Muted,
-		WiFiBars:     4,
 		Mode:         "normal",
 		RTT:          "--",
-	}
-
-	if st.LastSpeaker != "" && !lastSpeakerAt.IsZero() {
-		sec := int(time.Since(lastSpeakerAt).Seconds())
-		if sec < 0 {
-			sec = 0
-		}
-		out.LastSpeakAgo = fmt.Sprintf("%02ds", sec)
-	} else {
-		out.LastSpeakAgo = "—"
 	}
 
 	switch {
@@ -132,11 +129,32 @@ func (st talkkonnectStatus) toDisplayState(lastSpeakerAt time.Time) DisplayState
 		}
 	}
 
+	out.ChannelTree = mapChannelTree(st.ChannelTree)
 	out.Users = mapChannelUsers(st.ChannelUsers)
 	if len(out.Users) > 0 {
 		out.UserCount = len(out.Users)
 	} else {
 		out.UserCount = st.UsersOnline
+	}
+	return out
+}
+
+func mapChannelTree(from []uiChannelNode) []ChannelTreeNode {
+	if len(from) == 0 {
+		return nil
+	}
+	out := make([]ChannelTreeNode, 0, len(from))
+	for _, n := range from {
+		name := strings.TrimSpace(n.Name)
+		if name == "" {
+			continue
+		}
+		out = append(out, ChannelTreeNode{
+			Name:      name,
+			Depth:     n.Depth,
+			UserCount: n.UserCount,
+			Active:    n.Active,
+		})
 	}
 	return out
 }
