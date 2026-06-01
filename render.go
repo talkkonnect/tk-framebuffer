@@ -15,32 +15,35 @@ type ChannelUser struct {
 }
 
 type DisplayState struct {
-	DeviceName   string
-	DeviceIP     string
-	ServerName   string
-	ServerIP     string
-	Channel      string
-	ChannelTree  []ChannelTreeNode
-	Users        []ChannelUser
-	UserCount    int
-	TXRXStatus   string
-	Mode         string
-	LastSpeaker  string
-	Elapsed         string
-	ActivityEndTime string // wall-clock time when last TX or RX session ended
-	Volume       int
-	Muted        bool
-	RTT          string
-	Activity     string
-	Receiving    bool
-	Connected    bool
-	Transmitting bool
-	Offline        bool
-	MumbleUsername string
+	DeviceName         string
+	DeviceIP           string
+	ServerName         string
+	ServerIP           string
+	Channel            string
+	ChannelTree        []ChannelTreeNode
+	Users              []ChannelUser
+	UserCount          int
+	TXRXStatus         string
+	Mode               string
+	LastSpeaker        string
+	Elapsed            string
+	ActivityEndTime    string // wall-clock time when last TX or RX session ended
+	Volume             int
+	Muted              bool
+	RTT                string
+	Activity           string
+	Receiving          bool
+	Connected          bool
+	Transmitting       bool
+	Offline            bool
+	MumbleUsername     string
+	TalkkonnectVersion string
 }
 
+const graphicsVersion = "1.00"
+
 var (
-	colBlack = color.RGBA{0, 0, 0, 255}
+	colBlack      = color.RGBA{0, 0, 0, 255}
 	colBackground = color.RGBA{14, 14, 16, 255}
 	colPanel      = color.RGBA{24, 26, 30, 255}
 	colPanelHead  = color.RGBA{36, 42, 52, 255}
@@ -151,7 +154,7 @@ func userStatusColor(status string) color.Color {
 func drawUserIcon(img draw.Image, x, y int, status string, transmittingSelf bool) {
 	switch {
 	case transmittingSelf:
-		fillRect(img, image.Rect(x+2, y+5, x+9, y+15), colRed)
+		fillRect(img, image.Rect(x+2, y+5, x+9, y+15), colGreen)
 	case isSpeakingStatus(status):
 		fillRect(img, image.Rect(x+2, y+5, x+9, y+15), colGreen)
 	case strings.EqualFold(status, "muted"):
@@ -161,62 +164,67 @@ func drawUserIcon(img draw.Image, x, y int, status string, transmittingSelf bool
 	}
 }
 
-func drawSignalBar(img draw.Image, x, y, w, h int, level float64) {
+func vuSegmentColor(position float64) color.Color {
+	if position > 0.72 {
+		return colVURed
+	}
+	if position > 0.5 {
+		return colVUYellow
+	}
+	return colVUGreen
+}
+
+func drawSegmentedHorizontalTrack(img draw.Image, x, trackY, w, trackH int, borderCol color.Color, level float64) {
+	track := image.Rect(x, trackY, x+w, trackY+trackH)
+	fillRect(img, track, colVUDim)
+	strokeRect(img, track, borderCol, 1)
+	if level < 0 {
+		level = 0
+	}
+	if level > 1 {
+		level = 1
+	}
 	segments := 20
 	gap := 2
-	segH := (h - gap*(segments-1)) / segments
-	if segH < 2 {
-		segH = 2
+	innerW := w - 4
+	segW := (innerW - gap*(segments-1)) / segments
+	if segW < 2 {
+		segW = 2
 	}
-	drawText(img, x+12, y+8, "Activity Bar", colGreyText, sizeSmall)
-	track := image.Rect(x, y+12, x+w, y+12+h)
-	fillRect(img, track, colVUDim)
-	strokeRect(img, track, colPanelEdge, 1)
 	lit := int(float64(segments) * level)
 	if lit > segments {
 		lit = segments
 	}
 	for s := 0; s < segments; s++ {
-		sy := y + 12 + h - (s+1)*(segH+gap)
-		segRect := image.Rect(x+2, sy, x+w-2, sy+segH)
+		sx := x + 2 + s*(segW+gap)
+		segRect := image.Rect(sx, trackY+2, sx+segW, trackY+trackH-2)
 		if s < lit {
-			p := float64(s+1) / float64(segments)
-			var c color.Color = colVUGreen
-			if p > 0.72 {
-				c = colVURed
-			} else if p > 0.5 {
-				c = colVUYellow
-			}
-			fillRect(img, segRect, c)
+			fillRect(img, segRect, vuSegmentColor(float64(s+1)/float64(segments)))
 		}
 	}
 }
 
-func drawVerticalVolume(img draw.Image, x, y, w, h int, volume int) {
-	drawText(img, x+12, y+8, "RX Volume", colGreyText, sizeSmall)
-	track := image.Rect(x, y+12, x+w, y+12+h)
-	fillRect(img, track, colVUDim)
-	strokeRect(img, track, colBlueDim, 1)
-	knobY := y + 12 + h - int(float64(h-16)*float64(volume)/100.0) - 8
-	fillRect(img, image.Rect(x+2, knobY, x+w-2, knobY+8), colRed)
-	drawText(img, x+25, y+12+h+12, fmt.Sprintf("%d", volume), colWhite, sizeBody)
-}
-func muteBoxCaption(muted bool) string {
-	if muted {
-		return "MUTED"
-	}
-	return "ACTIVE"
+func drawSegmentedHorizontalBar(img draw.Image, x, y, w, trackH int, label string, borderCol color.Color, level float64) int {
+	drawText(img, x, y+10, label, colGreyText, sizeSmall)
+	trackY := y + 14
+	drawSegmentedHorizontalTrack(img, x, trackY, w, trackH, borderCol, level)
+	return trackY + trackH + 6
 }
 
-func drawMuteButton(img draw.Image, r image.Rectangle, muted bool) {
-	bg := colGreen
+func drawSignalBar(img draw.Image, x, y, w, trackH int, level float64) int {
+	return drawSegmentedHorizontalBar(img, x, y, w, trackH, "Signal", colPanelEdge, level)
+}
+
+func drawVolumeBar(img draw.Image, x, y, w, trackH int, volume int, muted bool) int {
+	labelCol := colWhite
 	if muted {
-		bg = colRed
+		labelCol = colRed
 	}
-	fillRect(img, r, bg)
-	strokeRect(img, r, colPanelEdge, 1)
-	caption := muteBoxCaption(muted)
-	drawTextCentered(img, r, caption, colBlack, sizeBody)
+	drawText(img, x, y+10, "Speaker Volume", labelCol, sizeSmall)
+	drawTextRight(img, x+w, y+10, fmt.Sprintf("%d", volume), colWhite, sizeSmall)
+	trackY := y + 14
+	drawSegmentedHorizontalTrack(img, x, trackY, w, trackH, colBlueDim, float64(volume)/100.0)
+	return trackY + trackH + 6
 }
 
 func renderFrame(img draw.Image, width, height int, st DisplayState, signal float64, talkkonnectOK bool, now time.Time) {
@@ -296,14 +304,10 @@ func renderFrame(img draw.Image, width, height int, st DisplayState, signal floa
 			break
 		}
 		drawUserIcon(img, col2.Min.X+10, y, u.Status, txSelf)
-//		statusLabel := u.Status
-//		if txSelf {
-//			statusLabel = "Transmitting"
-//		}
-		line := u.Name //+ " [" + statusLabel + "]"
+		line := u.Name
 		lineCol := userStatusColor(u.Status)
 		if txSelf {
-			lineCol = colRed
+			lineCol = colGreen
 		}
 		drawText(img, col2.Min.X+28, y+rowH-8, line, lineCol, textSize)
 		y += rowH
@@ -318,26 +322,34 @@ func renderFrame(img draw.Image, width, height int, st DisplayState, signal floa
 	drawColumnHeader(img, image.Rect(col3.Min.X, col3.Min.Y, col3.Max.X, col3.Min.Y+24), "Activity Status & Communication Mode")
 
 	txrx := st.TXRXStatus
+	txCol := colBlack
+	fillColor := colVUYellow
+
 	if txrx == "" {
-		txrx = "STANDBY"
+		txrx = "Online & Standing By"
+		txCol = colBlack
+		fillColor = colVUYellow
 	}
-	if txrx == "IDLE" {
-		txrx = "STANDBY"
+	if txrx == "Idle" {
+		txrx = "Online & Standing By"
+		fillColor = colVUYellow
 	}
-	txCol := colVUYellow
 	if st.Transmitting {
-		txCol = colRed
+		txCol = colBlack
+		fillColor = colVURed
 	}
 	if st.Receiving {
-		txCol = colGreen
+		txCol = colBlack
+		fillColor = colVUGreen
 	}
-	statusBox := image.Rect(col3.Min.X+8, col3.Min.Y+30, col3.Max.X-8, col3.Min.Y+58)
-	fillRect(img, statusBox, colVUDim)
-	strokeRect(img, statusBox, colPanelEdge, 1)
-	drawText(img, col3.Min.X+14, col3.Min.Y+52, ""+txrx, txCol, sizeBody)
 
+	statusBox := image.Rect(col3.Min.X+8, col3.Min.Y+34, col3.Max.X-8, col3.Min.Y+58)
+	fillRect(img, statusBox, colVUDim)
+	strokeRect(img, statusBox, colPanelEdge, 2)
+	fillRect(img, statusBox, fillColor)
+	drawText(img, col3.Min.X+14, col3.Min.Y+52, ""+txrx, txCol, sizeBody)
 	modeY := col3.Min.Y + 66
-	drawOutlinedButton(img, image.Rect(col3.Min.X+8, modeY, col3.Min.X+col3.Dx()/2-2, modeY+28), "Normal", st.Mode != "whisper")
+	drawOutlinedButton(img, image.Rect(col3.Min.X+8, modeY, col3.Min.X+col3.Dx()/2-2, modeY+28), "Broadcast", st.Mode != "whisper")
 	drawOutlinedButton(img, image.Rect(col3.Min.X+col3.Dx()/2+2, modeY, col3.Max.X-8, modeY+28), "Whisper", st.Mode == "whisper")
 	speaker := st.LastSpeaker
 	if speaker == "" {
@@ -355,23 +367,27 @@ func renderFrame(img draw.Image, width, height int, st DisplayState, signal floa
 	}
 	drawText(img, col3.Min.X+10, modeY+80, "Activity  : "+activityEnd, colGreyText, sizeLabel)
 
-	audioTop := col3.Min.Y + 170
-	audioH := col3.Max.Y - audioTop - 8
-	barW := col3.Dx()/3 - 4
-	//suvir fix box sizes here
-	drawSignalBar(img, col3.Min.X+6, audioTop, barW, audioH-20, signal)
-	drawVerticalVolume(img, col3.Min.X+col3.Dx()/3+4, audioTop, barW, audioH-20, st.Volume)
-	muteR := image.Rect(col3.Max.X-barW-2, audioTop+12, col3.Max.X-8, audioTop+audioH-8)
-	drawMuteButton(img, muteR, st.Muted)
+	barsX := col3.Min.X + 8
+	barsW := col3.Dx() - 16
+	barTrackH := 12
+
+	barsY := modeY + 250
+
+	barsY = drawSignalBar(img, barsX, barsY, barsW, barTrackH, signal)
+	volume := st.Volume
+	if st.Muted {
+		volume = 0
+	}
+	drawVolumeBar(img, barsX, barsY, barsW, barTrackH, volume, st.Muted)
 
 	// --- Footer ---
 	fillRect(img, image.Rect(0, height-footerH, width, height), colPanel)
 	strokeRect(img, image.Rect(0, height-footerH, width, height), colPanelEdge, 1)
-	logoRect := image.Rect(margin, height-footerH+4, margin+140, height-4)
-	drawBrandLogo(img, logoRect)
-	footerText := "Web: www.talkkonnect.com Facebook: www.facebook.com/talkkonnect Email: suvir@talkkonnect.com"
-	drawText(img, 50, height-8, footerText, colVUYellow, sizeLabel)
-	drawText(img, width-margin-125, height-8,now.Format(time.ANSIC), colGreyText, sizeSmall)
+	footerVersion := fmt.Sprintf("talKKonnect %s  Graphics %s", talkkonnectVersionLabel(st.TalkkonnectVersion), graphicsVersion)
+	footerText := "talkkonnect by Suvir Kumar (Released under the MPL License)"
+	drawText(img, 5, height-8, footerVersion, colGreyText, sizeLabel)
+	drawText(img, 240, height-8, footerText, colGreyText, sizeLabel)
+	drawText(img, width-margin-160, height-8, now.Format(time.ANSIC), colGreyText, sizeLabel)
 }
 
 func mockDisplayState() DisplayState {
@@ -400,18 +416,27 @@ func mockDisplayState() DisplayState {
 			{Name: "User8", Status: "idle"},
 			{Name: "User9", Status: "Muted"},
 		},
-		TXRXStatus:  "STANDBY",
-		Mode:        "normal",
-		LastSpeaker: "suvir",
-		Elapsed:         "08s",
-		ActivityEndTime: "14:32:05",
-		Volume:      72,
-		Muted:       false,
-		RTT:         "18ms",
-		Activity:       "idle",
-		Connected:      true,
-		MumbleUsername: "talkkonnect-demo",
+		TXRXStatus:         "StandBy",
+		Mode:               "Broadcast",
+		LastSpeaker:        "suvir",
+		Elapsed:            "08s",
+		ActivityEndTime:    "14:32:05",
+		Volume:             72,
+		Muted:              false,
+		RTT:                "18ms",
+		Activity:           "idle",
+		Connected:          true,
+		MumbleUsername:     "talkkonnect-demo",
+		TalkkonnectVersion: "4.06.03",
 	}
+}
+
+func talkkonnectVersionLabel(version string) string {
+	version = strings.TrimSpace(version)
+	if version == "" {
+		return "—"
+	}
+	return version
 }
 
 func offlineDisplayState() DisplayState {
@@ -423,7 +448,7 @@ func offlineDisplayState() DisplayState {
 	st.ChannelTree = nil
 	st.Users = nil
 	st.UserCount = 0
-	st.TXRXStatus = "OFFLINE"
+	st.TXRXStatus = "Offline"
 	st.LastSpeaker = "—"
 	st.Elapsed = "00s"
 	st.ActivityEndTime = ""

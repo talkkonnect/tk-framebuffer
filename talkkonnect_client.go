@@ -43,11 +43,12 @@ type talkkonnectStatus struct {
 		StationCount int    `json:"stationCount"`
 		Volume       int    `json:"volume"`
 	} `json:"internetRadio"`
-	IPAddress string `json:"ipAddress"`
-	Bitrate   string `json:"bitrate"`
-	UptimeSec int64  `json:"uptimeSec"`
+	IPAddress      string `json:"ipAddress"`
+	Bitrate        string `json:"bitrate"`
+	UptimeSec      int64  `json:"uptimeSec"`
 	Activity       string `json:"activity"`
 	MumbleUsername string `json:"mumbleUsername"`
+	Version        string `json:"version"`
 }
 
 type talkkonnectClient struct {
@@ -87,35 +88,36 @@ func (st talkkonnectStatus) toDisplayState() DisplayState {
 	}
 
 	out := DisplayState{
-		DeviceName:   strings.ToUpper(hostname),
-		DeviceIP:     st.IPAddress,
-		ServerName:   trimHost(st.Server),
-		ServerIP:     st.Server,
-		Channel:      strings.ToUpper(st.Channel),
-		UserCount:    st.UsersOnline,
-		LastSpeaker:  st.LastSpeaker,
-		Volume:       st.RXVolume,
-		Activity:     st.Activity,
-		Receiving:    st.Receiving,
-		Connected:    st.Connected,
-		Transmitting: st.Transmitting,
-		Muted:          st.Muted,
-		MumbleUsername: strings.TrimSpace(st.MumbleUsername),
-		Mode:           "normal",
-		RTT:            "--",
+		DeviceName:         strings.ToUpper(hostname),
+		DeviceIP:           st.IPAddress,
+		ServerName:         trimHost(st.Server),
+		ServerIP:           st.Server,
+		Channel:            strings.ToUpper(st.Channel),
+		UserCount:          st.UsersOnline,
+		LastSpeaker:        st.LastSpeaker,
+		Volume:             st.RXVolume,
+		Activity:           st.Activity,
+		Receiving:          st.Receiving,
+		Connected:          st.Connected,
+		Transmitting:       st.Transmitting,
+		Muted:              st.Muted,
+		MumbleUsername:     strings.TrimSpace(st.MumbleUsername),
+		Mode:               "normal",
+		RTT:                "--",
+		TalkkonnectVersion: strings.TrimSpace(st.Version),
 	}
 
 	switch {
 	case st.Transmitting:
-		out.TXRXStatus = "TX"
+		out.TXRXStatus = "T R A N S M I T T I N G "
 		out.Activity = "tx"
 	case st.Receiving:
-		out.TXRXStatus = "RX"
+		out.TXRXStatus = "R E C E I V I N G "
 		out.Activity = "rx"
 	case st.Connected:
-		out.TXRXStatus = "IDLE"
+		out.TXRXStatus = "Idle"
 	default:
-		out.TXRXStatus = "OFFLINE"
+		out.TXRXStatus = "Offline"
 	}
 
 	if st.InternetRadio.Playing || (st.InternetRadio.Enabled && st.InternetRadio.Status == "ducking") {
