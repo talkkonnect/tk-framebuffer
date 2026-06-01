@@ -94,24 +94,67 @@ func drawOutlinedButton(img draw.Image, r image.Rectangle, label string, active 
 	drawText(img, r.Min.X+10, r.Min.Y+(r.Dy()+12)/2, label, colGreyText, sizeLabel)
 }
 
+func isSpeakingStatus(status string) bool {
+	return strings.EqualFold(status, "speaking")
+}
+
+func isTransmittingSelf(u ChannelUser, transmitting bool, selfName string) bool {
+	if !transmitting {
+		return false
+	}
+	selfName = strings.TrimSpace(selfName)
+	if selfName == "" {
+		return false
+	}
+	return strings.EqualFold(u.Name, selfName)
+}
+
+// promoteTransmittingUser moves the logged-in user to the top while transmitting.
+func promoteTransmittingUser(users []ChannelUser, selfName string) []ChannelUser {
+	selfName = strings.TrimSpace(selfName)
+	if selfName == "" {
+		return users
+	}
+	idx := -1
+	for i, u := range users {
+		if strings.EqualFold(u.Name, selfName) {
+			idx = i
+			break
+		}
+	}
+	if idx <= 0 {
+		if idx == 0 {
+			return users
+		}
+		return append([]ChannelUser{{Name: selfName, Status: "idle"}}, users...)
+	}
+	out := make([]ChannelUser, 0, len(users))
+	out = append(out, users[idx])
+	out = append(out, users[:idx]...)
+	out = append(out, users[idx+1:]...)
+	return out
+}
+
 func userStatusColor(status string) color.Color {
-	switch status {
-	case "Speaking":
+	switch {
+	case isSpeakingStatus(status):
 		return colGreen
-	case "whisper":
+	case strings.EqualFold(status, "whisper"):
 		return colGreyText
-	case "Muted":
+	case strings.EqualFold(status, "muted"):
 		return colRed
 	default:
 		return colGreyText
 	}
 }
 
-func drawUserIcon(img draw.Image, x, y int, status string) {
-	switch status {
-	case "Speaking":
+func drawUserIcon(img draw.Image, x, y int, status string, transmittingSelf bool) {
+	switch {
+	case transmittingSelf:
+		fillRect(img, image.Rect(x+2, y+5, x+9, y+15), colRed)
+	case isSpeakingStatus(status):
 		fillRect(img, image.Rect(x+2, y+5, x+9, y+15), colGreen)
-	case "Muted":
+	case strings.EqualFold(status, "muted"):
 		fillRect(img, image.Rect(x+2, y+5, x+9, y+15), colRed)
 	default:
 		fillRect(img, image.Rect(x+2, y+5, x+9, y+15), colPanel)
@@ -235,21 +278,34 @@ func renderFrame(img draw.Image, width, height int, st DisplayState, signal floa
 	listTop := col2.Min.Y + 30
 	listMaxY := col2.Max.Y - 10
 	users := st.Users
+	if st.Transmitting {
+		users = promoteTransmittingUser(users, st.MumbleUsername)
+	}
 	y := listTop
 	shown := 0
 	for _, u := range users {
+		txSelf := isTransmittingSelf(u, st.Transmitting, st.MumbleUsername)
+		speaking := isSpeakingStatus(u.Status)
 		rowH := 22
 		textSize := sizeSmall
-		if u.Status == "Speaking" {
+		if speaking || txSelf {
 			rowH = 28
 			textSize = sizeBody
 		}
 		if y+rowH > listMaxY {
 			break
 		}
-		drawUserIcon(img, col2.Min.X+10, y, u.Status)
-		line := u.Name + " [" + u.Status + "]"
-		drawText(img, col2.Min.X+28, y+rowH-8, line, userStatusColor(u.Status), textSize)
+		drawUserIcon(img, col2.Min.X+10, y, u.Status, txSelf)
+//		statusLabel := u.Status
+//		if txSelf {
+//			statusLabel = "Transmitting"
+//		}
+		line := u.Name //+ " [" + statusLabel + "]"
+		lineCol := userStatusColor(u.Status)
+		if txSelf {
+			lineCol = colRed
+		}
+		drawText(img, col2.Min.X+28, y+rowH-8, line, lineCol, textSize)
 		y += rowH
 		shown++
 	}
