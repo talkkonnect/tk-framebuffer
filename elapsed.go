@@ -41,7 +41,7 @@ func (t *elapsedTracker) update(now time.Time, transmitting, receiving bool) (el
 	case receiving && !t.rxStart.IsZero():
 		elapsed = formatElapsed(now.Sub(t.rxStart))
 	default:
-		elapsed = "00s"
+		elapsed = "-"
 	}
 
 	activityEndTime = formatActivityEndTime(t.txEndedAt, t.rxEndedAt)

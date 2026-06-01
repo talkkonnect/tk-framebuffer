@@ -40,7 +40,7 @@ type DisplayState struct {
 	TalkkonnectVersion string
 }
 
-const graphicsVersion = "1.03"
+const graphicsVersion = "1.04"
 
 var (
 	colBlack       = color.RGBA{0, 0, 0, 255}
@@ -326,7 +326,7 @@ func renderFrame(img draw.Image, width, height int, st DisplayState, signal floa
 
 	// Right: STATUS & MODE
 	drawPanel(img, col3)
-	drawColumnHeader(img, image.Rect(col3.Min.X, col3.Min.Y, col3.Max.X, col3.Min.Y+24), "Activity Status & Communication Mode")
+	drawColumnHeader(img, image.Rect(col3.Min.X, col3.Min.Y, col3.Max.X, col3.Min.Y+24), "System Status & Communication Mode")
 
 	txrx := st.TXRXStatus
 	txCol := colBlack
@@ -360,19 +360,16 @@ func renderFrame(img draw.Image, width, height int, st DisplayState, signal floa
 	drawOutlinedButton(img, image.Rect(col3.Min.X+col3.Dx()/2+2, modeY, col3.Max.X-8, modeY+28), "Whisper", st.Mode == "whisper")
 	speaker := st.LastSpeaker
 	if speaker == "" {
-		speaker = " "
+		speaker = "-"
 	}
-	drawText(img, col3.Min.X+10, modeY+48, "Speaker: "+speaker, colGreyText, sizeLabel)
+	drawText(img, col3.Min.X+10, modeY+48, "Speaking: "+speaker, colGreyText, sizeLabel)
 	elapsed := st.Elapsed
 	if elapsed == "" {
-		elapsed = "00s"
+		elapsed = "-"
 	}
 	drawText(img, col3.Min.X+10, modeY+64, "Elapsed  : "+elapsed, colGreyText, sizeLabel)
 	activityEnd := st.ActivityEndTime
-	if activityEnd == "" {
-		activityEnd = "—"
-	}
-	drawText(img, col3.Min.X+10, modeY+80, "Activity  : "+activityEnd, colGreyText, sizeLabel)
+	drawText(img, col3.Min.X+10, modeY+80, "Last Activity  : "+activityEnd, colGreyText, sizeLabel)
 
 	barsX := col3.Min.X + 8
 	barsW := col3.Dx() - 16
@@ -457,12 +454,12 @@ func offlineDisplayState() DisplayState {
 	st.UserCount = 0
 	st.TXRXStatus = "Offline"
 	st.LastSpeaker = "—"
-	st.Elapsed = "00s"
+	st.Elapsed = "-"
 	st.ActivityEndTime = ""
 	st.Offline = true
 	st.Connected = false
 	st.MumbleUsername = ""
-	st.RTT = "--"
+	st.RTT = ""
 	return st
 }
 
