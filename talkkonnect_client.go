@@ -25,6 +25,7 @@ type uiChannelNode struct {
 type talkkonnectStatus struct {
 	Connected     bool            `json:"connected"`
 	Transmitting  bool            `json:"transmitting"`
+	ServerName    string          `json:"serverName"`
 	Server        string          `json:"server"`
 	Channel       string          `json:"channel"`
 	UsersOnline   int             `json:"usersOnline"`
@@ -90,7 +91,7 @@ func (st talkkonnectStatus) toDisplayState() DisplayState {
 	out := DisplayState{
 		DeviceName:         strings.ToUpper(hostname),
 		DeviceIP:           st.IPAddress,
-		ServerName:         trimHost(st.Server),
+		ServerName:         st.ServerName,
 		ServerIP:           st.Server,
 		Channel:            strings.ToUpper(st.Channel),
 		UserCount:          st.UsersOnline,

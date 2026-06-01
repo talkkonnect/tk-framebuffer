@@ -46,8 +46,8 @@ func drawChannelTree(img draw.Image, panel image.Rectangle, nodes []ChannelTreeN
 	y := panel.Min.Y + 30
 	maxY := panel.Max.Y - 8
 	const (
-		activeRowH   = 16
-		inactiveRowH = 18
+		activeRowH   = 14
+		inactiveRowH = 16
 	)
 
 	active, rest := partitionChannelTree(nodes)

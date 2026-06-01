@@ -40,7 +40,7 @@ type DisplayState struct {
 	TalkkonnectVersion string
 }
 
-const graphicsVersion = "1.01"
+const graphicsVersion = "1.03"
 
 var (
 	colBlack       = color.RGBA{0, 0, 0, 255}
@@ -92,7 +92,7 @@ func drawColumnHeader(img draw.Image, r image.Rectangle, title string) {
 func drawOutlinedButton(img draw.Image, r image.Rectangle, label string, active bool) {
 	c := colPanelEdge
 	if active {
-		c = colOrange
+		c = colGreen
 	}
 	strokeRect(img, r, c, 2)
 	drawText(img, r.Min.X+10, r.Min.Y+(r.Dy()+12)/2, label, colGreyText, sizeLabel)
@@ -213,6 +213,7 @@ func drawSegmentedHorizontalBar(img draw.Image, x, y, w, trackH int, label strin
 }
 
 func drawSignalBar(img draw.Image, x, y, w, trackH int, level float64) int {
+	drawTextRight(img, x+w, y+10, fmt.Sprintf("%d", int(level*100)), colWhite, sizeSmall)
 	return drawSegmentedHorizontalBar(img, x, y, w, trackH, "Signal", colPanelEdge, level)
 }
 
@@ -221,8 +222,13 @@ func drawVolumeBar(img draw.Image, x, y, w, trackH int, volume int, muted bool) 
 	if muted {
 		labelCol = colRed
 	}
-	drawText(img, x, y+10, "Speaker Volume", labelCol, sizeSmall)
-	drawTextRight(img, x+w, y+10, fmt.Sprintf("%d", volume), colWhite, sizeSmall)
+	if !muted {
+		drawText(img, x, y+10, "Speaker Volume", labelCol, sizeSmall)
+		drawTextRight(img, x+w, y+10, fmt.Sprintf("%d", volume), colWhite, sizeSmall)
+
+	} else {
+		drawText(img, x, y+10, "Speaker (Muted)", colRed, sizeSmall)
+	}
 	trackY := y + 14
 	drawSegmentedHorizontalTrack(img, x, trackY, w, trackH, colBlueDim, float64(volume)/100.0)
 	return trackY + trackH + 6
@@ -240,22 +246,23 @@ func renderFrame(img draw.Image, width, height int, st DisplayState, signal floa
 	fillRect(img, image.Rect(0, 0, width, headerH), colPanel)
 	strokeRect(img, image.Rect(0, 0, width, headerH), colPanelEdge, 1)
 
-	drawText(img, margin, 18, "DEVICE: "+st.DeviceName, colGreyText, sizeLabel)
-	drawText(img, margin, 36, "IP: "+st.DeviceIP, colGreyText, sizeLabel)
+	drawText(img, margin, 18, "HostName: "+st.DeviceName, colGreyText, sizeLabel)
+	drawText(img, margin, 36, "HostIP: "+st.DeviceIP, colGreyText, sizeLabel)
 
 	srvTitle := st.ServerName
 	if srvTitle == "" {
 		srvTitle = "Not Connected"
 	}
-	drawText(img, width/2-120, 18, "SERVER: "+srvTitle, colGreyText, sizeLabel)
-	drawText(img, width/2-120, 36, "IP: "+st.ServerIP, colGreyText, sizeLabel)
-
 	mumbleUser := strings.TrimSpace(st.MumbleUsername)
 	if mumbleUser == "" {
 		mumbleUser = "—"
 	}
+
+	drawText(img, width/2-120, 18, "Name: "+srvTitle, colGreyText, sizeLabel)
+	drawText(img, width/2-120, 32, "IP: "+st.ServerIP, colGreyText, sizeLabel)
 	userLine := "USER: " + mumbleUser
-	drawTextRight(img, width-margin, 18, userLine, colWhite, sizeLabel)
+	drawTextRight(img, width/2+44, 48, userLine, colGreyText, sizeLabel)
+	//	drawTextRight(img, width-margin, 18, userLine, colWhite, sizeLabel)
 
 	// --- Main 3 columns ---
 	bodyTop := headerH + margin
@@ -281,7 +288,7 @@ func renderFrame(img draw.Image, width, height int, st DisplayState, signal floa
 
 	// Middle: USERS IN CHANNEL
 	drawPanel(img, col2)
-	userTitle := fmt.Sprintf("Users In Current Channel (%d)", st.UserCount)
+	userTitle := fmt.Sprintf("%d Users In Connected Channel", st.UserCount)
 	drawColumnHeader(img, image.Rect(col2.Min.X, col2.Min.Y, col2.Max.X, col2.Min.Y+24), userTitle)
 	listTop := col2.Min.Y + 30
 	listMaxY := col2.Max.Y - 10
