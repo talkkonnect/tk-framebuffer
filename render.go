@@ -40,25 +40,26 @@ type DisplayState struct {
 	TalkkonnectVersion string
 }
 
-const graphicsVersion = "1.00"
+const graphicsVersion = "1.01"
 
 var (
-	colBlack      = color.RGBA{0, 0, 0, 255}
-	colBackground = color.RGBA{14, 14, 16, 255}
-	colPanel      = color.RGBA{24, 26, 30, 255}
-	colPanelHead  = color.RGBA{36, 42, 52, 255}
-	colPanelEdge  = color.RGBA{58, 72, 92, 255}
-	colBlue       = color.RGBA{72, 132, 196, 255}
-	colBlueDim    = color.RGBA{44, 68, 98, 255}
-	colGreyText   = color.RGBA{170, 174, 182, 255}
-	colWhite      = color.RGBA{236, 238, 242, 255}
-	colOrange     = color.RGBA{232, 118, 38, 255}
-	colRed        = color.RGBA{210, 55, 65, 255}
-	colGreen      = color.RGBA{62, 190, 98, 255}
-	colVUDim      = color.RGBA{20, 22, 26, 255}
-	colVUGreen    = color.RGBA{50, 170, 70, 255}
-	colVUYellow   = color.RGBA{210, 190, 60, 255}
-	colVURed      = color.RGBA{200, 55, 50, 255}
+	colBlack       = color.RGBA{0, 0, 0, 255}
+	colBackground  = color.RGBA{14, 14, 16, 255}
+	colPanel       = color.RGBA{24, 26, 30, 255}
+	colPanelHead   = color.RGBA{36, 42, 52, 255}
+	colPanelEdge   = color.RGBA{58, 72, 92, 255}
+	colBlue        = color.RGBA{72, 132, 196, 255}
+	colBlueDim     = color.RGBA{44, 68, 98, 255}
+	colGreyText    = color.RGBA{170, 174, 182, 255}
+	colWhite       = color.RGBA{236, 238, 242, 255}
+	colOrange      = color.RGBA{232, 118, 38, 255}
+	colRed         = color.RGBA{210, 55, 65, 255}
+	colGreen       = color.RGBA{62, 190, 98, 255}
+	colVUDim       = color.RGBA{20, 22, 26, 255}
+	colVUGreen     = color.RGBA{50, 170, 70, 255}
+	colVUYellow    = color.RGBA{210, 190, 60, 255}
+	colLightYellow = color.RGBA{200, 150, 60, 255}
+	colVURed       = color.RGBA{200, 55, 50, 255}
 )
 
 func fillRect(img draw.Image, r image.Rectangle, col color.Color) {
@@ -255,7 +256,6 @@ func renderFrame(img draw.Image, width, height int, st DisplayState, signal floa
 	}
 	userLine := "USER: " + mumbleUser
 	drawTextRight(img, width-margin, 18, userLine, colWhite, sizeLabel)
-	drawTalkkonnectStatusLED(img, width, margin, talkkonnectOK, now)
 
 	// --- Main 3 columns ---
 	bodyTop := headerH + margin
@@ -323,16 +323,15 @@ func renderFrame(img draw.Image, width, height int, st DisplayState, signal floa
 
 	txrx := st.TXRXStatus
 	txCol := colBlack
-	fillColor := colVUYellow
+	fillColor := colLightYellow
 
 	if txrx == "" {
-		txrx = "Online & Standing By"
-		txCol = colBlack
-		fillColor = colVUYellow
+		txrx = "O N L I N E"
+		fillColor = colLightYellow
 	}
 	if txrx == "Idle" {
-		txrx = "Online & Standing By"
-		fillColor = colVUYellow
+		txrx = "O N L I N E"
+		fillColor = colLightYellow
 	}
 	if st.Transmitting {
 		txCol = colBlack
@@ -348,6 +347,7 @@ func renderFrame(img draw.Image, width, height int, st DisplayState, signal floa
 	strokeRect(img, statusBox, colPanelEdge, 2)
 	fillRect(img, statusBox, fillColor)
 	drawText(img, col3.Min.X+14, col3.Min.Y+52, ""+txrx, txCol, sizeBody)
+	drawTalkkonnectStatusLED(img, statusBox, talkkonnectOK, now)
 	modeY := col3.Min.Y + 66
 	drawOutlinedButton(img, image.Rect(col3.Min.X+8, modeY, col3.Min.X+col3.Dx()/2-2, modeY+28), "Broadcast", st.Mode != "whisper")
 	drawOutlinedButton(img, image.Rect(col3.Min.X+col3.Dx()/2+2, modeY, col3.Max.X-8, modeY+28), "Whisper", st.Mode == "whisper")
