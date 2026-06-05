@@ -77,6 +77,9 @@ func main() {
 		display.Elapsed, display.ActivityEndTime = elapsed.update(now, display.Transmitting, display.Receiving)
 
 		renderFrame(frame, fb.width, fb.height, display, signalLevel(display), talkkonnectOK, now)
+		if tk != nil && talkkonnectOK {
+			releaseChannelTreeNodes(display.ChannelTree)
+		}
 		if err := fb.blitRGBA(frame); err != nil {
 			fmt.Printf("framebuffer blit error: %v\n", err)
 		}

@@ -6,6 +6,7 @@ import (
 	"image/color"
 	"image/draw"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -40,7 +41,7 @@ type DisplayState struct {
 	TalkkonnectVersion string
 }
 
-const graphicsVersion = "1.05"
+const graphicsVersion = "1.06"
 
 var (
 	colBlack       = color.RGBA{0, 0, 0, 255}
@@ -61,6 +62,35 @@ var (
 	colLightYellow = color.RGBA{200, 150, 60, 255}
 	colVURed       = color.RGBA{200, 55, 50, 255}
 )
+
+var channelUserPool = sync.Pool{
+	New: func() any {
+		s := make([]ChannelUser, 0, 32)
+		return &s
+	},
+}
+
+func acquireChannelUsers(minCap int) []ChannelUser {
+	p := channelUserPool.Get().(*[]ChannelUser)
+	s := *p
+	if cap(s) < minCap {
+		channelUserPool.Put(p)
+		return make([]ChannelUser, 0, minCap)
+	}
+	return s[:0]
+}
+
+// releaseChannelUsers returns a pooled slice to channelUserPool after zeroing elements.
+func releaseChannelUsers(s []ChannelUser) {
+	if s == nil {
+		return
+	}
+	for i := range s {
+		s[i] = ChannelUser{}
+	}
+	s = s[:0]
+	channelUserPool.Put(&s)
+}
 
 func strokeRect(img draw.Image, r image.Rectangle, col color.Color, w int) {
 	if w < 1 {
@@ -110,10 +140,11 @@ func isTransmittingSelf(u ChannelUser, transmitting bool, selfName string) bool 
 }
 
 // promoteTransmittingUser moves the logged-in user to the top while transmitting.
-func promoteTransmittingUser(users []ChannelUser, selfName string) []ChannelUser {
+// When pooled is true, the caller must call releaseChannelUsers on out after use.
+func promoteTransmittingUser(users []ChannelUser, selfName string) (out []ChannelUser, pooled bool) {
 	selfName = strings.TrimSpace(selfName)
 	if selfName == "" {
-		return users
+		return users, false
 	}
 	idx := -1
 	for i, u := range users {
@@ -122,17 +153,24 @@ func promoteTransmittingUser(users []ChannelUser, selfName string) []ChannelUser
 			break
 		}
 	}
-	if idx <= 0 {
-		if idx == 0 {
-			return users
-		}
-		return append([]ChannelUser{{Name: selfName, Status: "idle"}}, users...)
+	if idx == 0 {
+		return users, false
 	}
-	out := make([]ChannelUser, 0, len(users))
+	needCap := len(users)
+	if idx < 0 {
+		needCap = len(users) + 1
+	}
+	out = acquireChannelUsers(needCap)
+	pooled = true
+	if idx < 0 {
+		out = append(out, ChannelUser{Name: selfName, Status: "idle"})
+		out = append(out, users...)
+		return out, pooled
+	}
 	out = append(out, users[idx])
 	out = append(out, users[:idx]...)
 	out = append(out, users[idx+1:]...)
-	return out
+	return out, pooled
 }
 
 func userStatusColor(status string) color.Color {
@@ -308,7 +346,11 @@ func renderFrame(img draw.Image, width, height int, st DisplayState, signal floa
 	listMaxY := col2.Max.Y - 10
 	users := st.Users
 	if st.Transmitting {
-		users = promoteTransmittingUser(users, st.MumbleUsername)
+		var promotedPooled bool
+		users, promotedPooled = promoteTransmittingUser(users, st.MumbleUsername)
+		if promotedPooled {
+			defer releaseChannelUsers(users)
+		}
 	}
 	y := listTop
 	shown := 0

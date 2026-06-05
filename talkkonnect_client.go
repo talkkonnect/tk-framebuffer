@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -55,6 +56,35 @@ type talkkonnectStatus struct {
 type talkkonnectClient struct {
 	url    string
 	client *http.Client
+}
+
+var channelTreeNodePool = sync.Pool{
+	New: func() any {
+		s := make([]ChannelTreeNode, 0, 32)
+		return &s
+	},
+}
+
+func acquireChannelTreeNodes(minCap int) []ChannelTreeNode {
+	p := channelTreeNodePool.Get().(*[]ChannelTreeNode)
+	s := *p
+	if cap(s) < minCap {
+		channelTreeNodePool.Put(p)
+		return make([]ChannelTreeNode, 0, minCap)
+	}
+	return s[:0]
+}
+
+// releaseChannelTreeNodes returns a pooled slice to channelTreeNodePool after zeroing elements.
+func releaseChannelTreeNodes(s []ChannelTreeNode) {
+	if s == nil {
+		return
+	}
+	for i := range s {
+		s[i] = ChannelTreeNode{}
+	}
+	s = s[:0]
+	channelTreeNodePool.Put(&s)
 }
 
 func newTalkkonnectClient(url string) *talkkonnectClient {
@@ -148,7 +178,7 @@ func mapChannelTree(from []uiChannelNode) []ChannelTreeNode {
 	if len(from) == 0 {
 		return nil
 	}
-	out := make([]ChannelTreeNode, 0, len(from))
+	out := acquireChannelTreeNodes(len(from))
 	for _, n := range from {
 		name := strings.TrimSpace(n.Name)
 		if name == "" {
