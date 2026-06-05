@@ -19,42 +19,49 @@ const (
 	kdText         = 0x00
 )
 
-func framebufferConsoleBindPath() string {
-	entries, err := os.ReadDir("/sys/class/vtconsole")
+const vtconsoleClassDir = "/sys/class/vtconsole"
+
+// unbindFramebufferConsole disconnects the kernel framebuffer console via sysfs so
+// direct framebuffer writes are visible. Returns a cleanup func that rebinds the
+// console if it was previously bound.
+func unbindFramebufferConsole() func() {
+	entries, err := os.ReadDir(vtconsoleClassDir)
 	if err != nil {
-		return "/sys/class/vtconsole/vtcon1/bind"
+		return func() {}
 	}
+
+	var bindPath string
 	for _, entry := range entries {
-		nameFile := filepath.Join("/sys/class/vtconsole", entry.Name(), "name")
+		nameFile := filepath.Join(vtconsoleClassDir, entry.Name(), "name")
 		nameBytes, err := os.ReadFile(nameFile)
 		if err != nil {
 			continue
 		}
-		if strings.Contains(string(nameBytes), "frame buffer") {
-			return filepath.Join("/sys/class/vtconsole", entry.Name(), "bind")
+		name := strings.ToLower(strings.TrimSpace(string(nameBytes)))
+		if !strings.Contains(strings.ReplaceAll(name, " ", ""), "framebuffer") {
+			continue
 		}
+		bindPath = filepath.Join(vtconsoleClassDir, entry.Name(), "bind")
+		break
 	}
-	return "/sys/class/vtconsole/vtcon1/bind"
-}
+	if bindPath == "" {
+		return func() {}
+	}
 
-func setFramebufferConsoleBound(path string, on bool) error {
-	val := "0"
-	if on {
-		val = "1"
+	bindBytes, err := os.ReadFile(bindPath)
+	if err != nil {
+		return func() {}
 	}
-	return os.WriteFile(path, []byte(val), 0)
-}
+	if strings.TrimSpace(string(bindBytes)) != "1" {
+		return func() {}
+	}
 
-func stopGetty(vt int) func() {
-	unit := fmt.Sprintf("getty@tty%d.service", vt)
-	wasActive := exec.Command("systemctl", "is-active", "--quiet", unit).Run() == nil
-	if wasActive {
-		_ = exec.Command("systemctl", "stop", unit).Run()
+	if err := os.WriteFile(bindPath, []byte("0"), 0); err != nil {
+		return func() {}
 	}
+
 	return func() {
-		if wasActive {
-			_ = exec.Command("systemctl", "start", unit).Run()
-		}
+		_ = os.WriteFile(bindPath, []byte("1"), 0)
 	}
 }
 
@@ -65,26 +72,13 @@ func acquireLinuxDisplay(fb *linuxFramebuffer, vt int) (func(), error) {
 		vt = 1
 	}
 
-	bindPath := framebufferConsoleBindPath()
-	consoleWasBound := true
-	if raw, err := os.ReadFile(bindPath); err == nil && strings.TrimSpace(string(raw)) == "0" {
-		consoleWasBound = false
-	}
-
 	_ = exec.Command("chvt", fmt.Sprintf("%d", vt)).Run()
-	restoreGetty := stopGetty(vt)
+	restoreConsole := unbindFramebufferConsole()
 
 	ttyPath := fmt.Sprintf("/dev/tty%d", vt)
 	if tty, err := os.OpenFile(ttyPath, os.O_RDWR, 0); err == nil {
 		_, _, _ = syscall.Syscall(syscall.SYS_IOCTL, tty.Fd(), kdSetMode, kdGraphics)
 		tty.Close()
-	}
-
-	if consoleWasBound {
-		if err := setFramebufferConsoleBound(bindPath, false); err != nil {
-			restoreGetty()
-			return nil, fmt.Errorf("release framebuffer console: %w (run as root)", err)
-		}
 	}
 
 	if fb.file != nil {
@@ -95,14 +89,11 @@ func acquireLinuxDisplay(fb *linuxFramebuffer, vt int) (func(), error) {
 	fb.fillSolid(colBackground)
 
 	cleanup := func() {
-		if consoleWasBound {
-			_ = setFramebufferConsoleBound(bindPath, true)
-		}
 		if tty, err := os.OpenFile(ttyPath, os.O_RDWR, 0); err == nil {
 			_, _, _ = syscall.Syscall(syscall.SYS_IOCTL, tty.Fd(), kdSetMode, kdText)
 			tty.Close()
 		}
-		restoreGetty()
+		restoreConsole()
 	}
 
 	return cleanup, nil

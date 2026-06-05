@@ -21,15 +21,28 @@ func commLEDLit(now time.Time) bool {
 func drawTalkkonnectStatusLED(img draw.Image, r image.Rectangle, talkkonnectOK bool, now time.Time) {
 	ledX := r.Max.X - commLEDSize - 4
 	ledY := r.Min.Y + (r.Dy()-commLEDSize)/2
-	led := image.Rect(ledX, ledY, ledX+commLEDSize, ledY+commLEDSize)
 
-	fillRect(img, led, colVUDim)
-	strokeRect(img, led, colPanelEdge, 1)
-
-	if !commLEDLit(now) {
+	if rgba, ok := img.(*image.RGBA); ok {
+		blitRGBATile(rgba, ledX, ledY, commLEDSize, commLEDSize, tileCommLEDOff)
+		strokeRect(img, image.Rect(ledX, ledY, ledX+commLEDSize, ledY+commLEDSize), colPanelEdge, 1)
+		if !commLEDLit(now) {
+			return
+		}
+		lit := tileCommLEDGreen
+		if !talkkonnectOK {
+			lit = tileCommLEDRed
+		}
+		blitRGBATile(rgba, ledX, ledY, commLEDSize, commLEDSize, lit)
+		strokeRect(img, image.Rect(ledX, ledY, ledX+commLEDSize, ledY+commLEDSize), colWhite, 1)
 		return
 	}
 
+	led := image.Rect(ledX, ledY, ledX+commLEDSize, ledY+commLEDSize)
+	fillRect(img, led, colVUDim)
+	strokeRect(img, led, colPanelEdge, 1)
+	if !commLEDLit(now) {
+		return
+	}
 	lit := colGreen
 	if !talkkonnectOK {
 		lit = colRed

@@ -10,7 +10,6 @@ import (
 
 func main() {
 	talkkonnectURL := flag.String("talkkonnect", "http://127.0.0.1:8080/uistatus", "talkkonnect /uistatus JSON endpoint")
-	logoPath := flag.String("logo", "talkkonnect-logo.png", "talkkonnect brand logo PNG for footer")
 	mockMode := flag.Bool("mock", false, "run with demo data instead of talkkonnect")
 	fbDevice := flag.String("fb", "/dev/fb0", "Linux framebuffer device")
 	fontPath := flag.String("font", "DejaVuSans.ttf", "Latin font (DejaVu Sans)")
@@ -34,7 +33,6 @@ func main() {
 	}
 
 	initFonts(*fontPath, *thaiFontPath)
-	initBrandLogo(*logoPath)
 
 	var tk *talkkonnectClient
 	if !*mockMode {

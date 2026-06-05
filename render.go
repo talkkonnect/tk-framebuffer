@@ -40,7 +40,7 @@ type DisplayState struct {
 	TalkkonnectVersion string
 }
 
-const graphicsVersion = "1.04"
+const graphicsVersion = "1.05"
 
 var (
 	colBlack       = color.RGBA{0, 0, 0, 255}
@@ -61,10 +61,6 @@ var (
 	colLightYellow = color.RGBA{200, 150, 60, 255}
 	colVURed       = color.RGBA{200, 55, 50, 255}
 )
-
-func fillRect(img draw.Image, r image.Rectangle, col color.Color) {
-	draw.Draw(img, r, &image.Uniform{col}, image.Point{}, draw.Src)
-}
 
 func strokeRect(img draw.Image, r image.Rectangle, col color.Color, w int) {
 	if w < 1 {
@@ -153,6 +149,24 @@ func userStatusColor(status string) color.Color {
 }
 
 func drawUserIcon(img draw.Image, x, y int, status string, transmittingSelf bool) {
+	rgba, ok := img.(*image.RGBA)
+	if !ok {
+		drawUserIconFallback(img, x, y, status, transmittingSelf)
+		return
+	}
+	var tile []byte
+	switch {
+	case transmittingSelf, isSpeakingStatus(status):
+		tile = tileUserIconGreen
+	case strings.EqualFold(status, "muted"):
+		tile = tileUserIconRed
+	default:
+		tile = tileUserIconPanel
+	}
+	blitRGBATile(rgba, x+2, y+5, userIconW, userIconH, tile)
+}
+
+func drawUserIconFallback(img draw.Image, x, y int, status string, transmittingSelf bool) {
 	switch {
 	case transmittingSelf:
 		fillRect(img, image.Rect(x+2, y+5, x+9, y+15), colGreen)

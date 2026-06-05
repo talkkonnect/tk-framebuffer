@@ -43,12 +43,13 @@ type fbFixScreeninfo struct {
 }
 
 type linuxFramebuffer struct {
-	file   *os.File
-	mem    []byte
-	width  int
-	height int
-	bpp    int
-	stride int
+	file    *os.File
+	mem     []byte
+	width   int
+	height  int
+	bpp     int
+	stride  int
+	blitRow []byte
 }
 
 func openLinuxFramebuffer(path string) (*linuxFramebuffer, error) {
@@ -113,24 +114,81 @@ func (fb *linuxFramebuffer) close() error {
 	return nil
 }
 
-func rgb565(r, g, b byte) uint16 {
-	return uint16(r>>3)<<11 | uint16(g>>2)<<5 | uint16(b>>3)
+func (fb *linuxFramebuffer) rowLen() int {
+	return fb.width * 2
+}
+
+func (fb *linuxFramebuffer) ensureBlitRow() []byte {
+	rowLen := fb.rowLen()
+	if len(fb.blitRow) < rowLen {
+		fb.blitRow = make([]byte, rowLen)
+	}
+	return fb.blitRow[:rowLen]
+}
+
+func rgb565Store(dst []byte, x int, pix uint16) {
+	i := x * 2
+	dst[i] = byte(pix & 0xff)
+	dst[i+1] = byte(pix >> 8)
+}
+
+func rgbaRowToRGB565(dst, src []byte, width int) {
+	for x := 0; x < width; x++ {
+		i := x * 4
+		pix := rgb565(src[i], src[i+1], src[i+2])
+		rgb565Store(dst, x, pix)
+	}
 }
 
 func (fb *linuxFramebuffer) fillSolid(c color.RGBA) {
 	if fb.bpp != 2 {
 		return
 	}
-	pix := rgb565(c.R, c.G, c.B)
+	rowLen := fb.rowLen()
+	if rowLen == 0 || fb.height == 0 {
+		return
+	}
+
+	pix := rgb565FromRGBA(c)
+	first := fb.mem[:rowLen]
 	lo := byte(pix & 0xff)
 	hi := byte(pix >> 8)
-	for y := 0; y < fb.height; y++ {
-		row := fb.mem[y*fb.stride : y*fb.stride+fb.width*2]
-		for x := 0; x < fb.width; x++ {
-			i := x * 2
-			row[i] = lo
-			row[i+1] = hi
+	for i := 0; i < rowLen; i += 2 {
+		first[i] = lo
+		first[i+1] = hi
+	}
+	for y := 1; y < fb.height; y++ {
+		copy(fb.mem[y*fb.stride:y*fb.stride+rowLen], first)
+	}
+}
+
+// blitRGB565 copies a pre-baked w×h RGB565 sprite into framebuffer memory at (x, y).
+func (fb *linuxFramebuffer) blitRGB565(x, y, w, h int, sprite []byte) {
+	if fb.bpp != 2 || w <= 0 || h <= 0 {
+		return
+	}
+	rowBytes := w * 2
+	if len(sprite) < rowBytes*h {
+		return
+	}
+	for row := 0; row < h; row++ {
+		if y+row < 0 || y+row >= fb.height {
+			continue
 		}
+		dstY := y + row
+		dstStart := dstY*fb.stride + x*2
+		dstEnd := dstStart + rowBytes
+		if x < 0 || dstStart >= len(fb.mem) {
+			continue
+		}
+		if dstEnd > dstY*fb.stride+fb.width*2 {
+			dstEnd = dstY*fb.stride + fb.width*2
+		}
+		if dstEnd <= dstStart {
+			continue
+		}
+		n := dstEnd - dstStart
+		copy(fb.mem[dstStart:dstEnd], sprite[row*rowBytes:row*rowBytes+n])
 	}
 }
 
@@ -138,15 +196,21 @@ func (fb *linuxFramebuffer) blitRGBA(img *image.RGBA) error {
 	if fb.bpp != 2 {
 		return fmt.Errorf("unsupported framebuffer bpp: %d", fb.bpp*8)
 	}
+	rowLen := fb.rowLen()
+	if rowLen == 0 {
+		return nil
+	}
+
+	rowBuf := fb.ensureBlitRow()
+	bounds := img.Bounds()
+	srcStride := img.Stride
+	srcPix := img.Pix
+	minX := bounds.Min.X
+
 	for y := 0; y < fb.height; y++ {
-		row := fb.mem[y*fb.stride : y*fb.stride+fb.width*2]
-		for x := 0; x < fb.width; x++ {
-			r, g, b, _ := img.At(x, y).RGBA()
-			pix := rgb565(byte(r>>8), byte(g>>8), byte(b>>8))
-			i := x * 2
-			row[i] = byte(pix & 0xff)
-			row[i+1] = byte(pix >> 8)
-		}
+		srcOff := (y-bounds.Min.Y)*srcStride + minX*4
+		rgbaRowToRGB565(rowBuf, srcPix[srcOff:srcOff+rowLen*2], fb.width)
+		copy(fb.mem[y*fb.stride:y*fb.stride+rowLen], rowBuf)
 	}
 	return nil
 }
