@@ -1,10 +1,13 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"image"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 )
 
@@ -49,6 +52,10 @@ func main() {
 		fmt.Printf("Polling talkkonnect at %s\n", *talkkonnectURL)
 	}
 
+	// Root context: SIGINT/SIGTERM call cancel(), which propagates to every fetch via ctx.
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
 	// Single frame ticker; stopped on exit via defer (no extra Timer/Ticker instances).
 	ticker := time.NewTicker(100 * time.Millisecond)
 	defer ticker.Stop()
@@ -57,36 +64,46 @@ func main() {
 	var elapsed elapsedTracker
 	frameNum := 0
 
-	for now := range ticker.C {
-		display := mockDisplayState()
-		talkkonnectOK := *mockMode
-		if tk != nil {
-			st, err := tk.fetch()
-			talkkonnectOK = err == nil
-			if err != nil {
-				if time.Since(lastErr) > 5*time.Second {
-					fmt.Printf("talkkonnect status error: %v\n", err)
-					lastErr = time.Now()
+	for {
+		select {
+		case <-ctx.Done():
+			// Cascade: in-flight HTTP requests see ctx.Err() and return immediately.
+			fmt.Println("Shutdown signal received, exiting.")
+			return
+		case now := <-ticker.C:
+			display := mockDisplayState()
+			talkkonnectOK := *mockMode
+			if tk != nil {
+				st, err := tk.fetch(ctx)
+				talkkonnectOK = err == nil
+				if err != nil {
+					if ctx.Err() != nil {
+						return
+					}
+					if time.Since(lastErr) > 5*time.Second {
+						fmt.Printf("talkkonnect status error: %v\n", err)
+						lastErr = time.Now()
+					}
+					display = offlineDisplayState()
+				} else {
+					display = st.toDisplayState()
 				}
-				display = offlineDisplayState()
-			} else {
-				display = st.toDisplayState()
 			}
-		}
 
-		display.Elapsed, display.ActivityEndTime = elapsed.update(now, display.Transmitting, display.Receiving)
+			display.Elapsed, display.ActivityEndTime = elapsed.update(now, display.Transmitting, display.Receiving)
 
-		renderFrame(frame, fb.width, fb.height, display, signalLevel(display), talkkonnectOK, now)
-		if tk != nil && talkkonnectOK {
-			releaseChannelTreeNodes(display.ChannelTree)
-		}
-		if err := fb.blitRGBA(frame); err != nil {
-			fmt.Printf("framebuffer blit error: %v\n", err)
-		}
+			renderFrame(frame, fb.width, fb.height, display, signalLevel(display), talkkonnectOK, now)
+			if tk != nil && talkkonnectOK {
+				releaseChannelTreeNodes(display.ChannelTree)
+			}
+			if err := fb.blitRGBA(frame); err != nil {
+				fmt.Printf("framebuffer blit error: %v\n", err)
+			}
 
-		frameNum++
-		if frameNum == 1 {
-			fmt.Println("First frame drawn to screen.")
+			frameNum++
+			if frameNum == 1 {
+				fmt.Println("First frame drawn to screen.")
+			}
 		}
 	}
 }

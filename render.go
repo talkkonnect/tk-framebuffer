@@ -41,7 +41,7 @@ type DisplayState struct {
 	TalkkonnectVersion string
 }
 
-const graphicsVersion = "1.06"
+const graphicsVersion = "1.07"
 
 var (
 	colBlack       = color.RGBA{0, 0, 0, 255}

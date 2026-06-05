@@ -1,13 +1,13 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
 	"strings"
 	"sync"
-	"time"
 )
 
 type uiChannelUser struct {
@@ -90,15 +90,18 @@ func releaseChannelTreeNodes(s []ChannelTreeNode) {
 func newTalkkonnectClient(url string) *talkkonnectClient {
 	return &talkkonnectClient{
 		url: strings.TrimSpace(url),
-		client: &http.Client{
-			Timeout: 2 * time.Second,
-		},
+		// No Client.Timeout: deadlines and cancellation flow from context.Context.
+		client: &http.Client{},
 	}
 }
 
-func (c *talkkonnectClient) fetch() (talkkonnectStatus, error) {
+func (c *talkkonnectClient) fetch(ctx context.Context) (talkkonnectStatus, error) {
 	var st talkkonnectStatus
-	resp, err := c.client.Get(c.url)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.url, nil)
+	if err != nil {
+		return st, err
+	}
+	resp, err := c.client.Do(req)
 	if err != nil {
 		return st, err
 	}
