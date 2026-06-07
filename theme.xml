@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<UIConfig>
+  <colors>
+    <black>#000000</black>
+    <background>#0E0E10</background>
+    <panel>#181A1E</panel>
+    <panelHead>#242A34</panelHead>
+    <panelEdge>#3A485C</panelEdge>
+    <blue>#4884C4</blue>
+    <blueDim>#2C4462</blueDim>
+    <greyText>#AAAEB6</greyText>
+    <white>#ECEEF2</white>
+    <orange>#E87626</orange>
+    <red>#D23741</red>
+    <green>#3EBE62</green>
+    <vuDim>#14161A</vuDim>
+    <vuGreen>#32AA46</vuGreen>
+    <vuYellow>#D2BE3C</vuYellow>
+    <lightYellow>#C8963C</lightYellow>
+    <vuRed>#C83732</vuRed>
+    <signalInactive>#2A2E36</signalInactive>
+  </colors>
+  <layout>
+    <headerHeight>54</headerHeight>
+    <footerHeight>34</footerHeight>
+    <margin>6</margin>
+    <gap>6</gap>
+    <columnHeaderHeight>24</columnHeaderHeight>
+    <panelContentTop>30</panelContentTop>
+    <footerVersionX>5</footerVersionX>
+    <footerTextX>240</footerTextX>
+    <footerClockRightMargin>160</footerClockRightMargin>
+    <serverInfoCenterOffset>120</serverInfoCenterOffset>
+    <userLineCenterOffset>44</userLineCenterOffset>
+    <signalBarsYOffset>250</signalBarsYOffset>
+    <volumeBarTrackHeight>12</volumeBarTrackHeight>
+  </layout>
+  <captions>
+    <hostNameLabel>HostName:</hostNameLabel>
+    <hostIPLabel>HostIP:</hostIPLabel>
+    <serverNameLabel>Name:</serverNameLabel>
+    <serverIPLabel>IP:</serverIPLabel>
+    <userPrefix>USER:</userPrefix>
+    <notConnected>Not Connected</notConnected>
+    <emptyPlaceholder>—</emptyPlaceholder>
+    <channelListTitle>Channel List</channelListTitle>
+    <usersInChannelTitle>%d Users In Connected Channel</usersInChannelTitle>
+    <statusPanelTitle>System Status &amp; Communication Mode</statusPanelTitle>
+    <onlineStatus>O N L I N E</onlineStatus>
+    <broadcastLabel>Broadcast</broadcastLabel>
+    <whisperLabel>Whisper</whisperLabel>
+    <speakingLabel>Speaking:</speakingLabel>
+    <elapsedLabel>Elapsed  :</elapsedLabel>
+    <lastActivityLabel>Last Activity  :</lastActivityLabel>
+    <speakerVolumeLabel>Speaker Volume</speakerVolumeLabel>
+    <speakerMutedLabel>Speaker (Muted)</speakerMutedLabel>
+    <signalLevelLabel>Signal Level (RX/TX)</signalLevelLabel>
+    <scrollIndicator> </scrollIndicator>
+    <footerVersionFormat>talKKonnect %s  Graphics %s</footerVersionFormat>
+    <footerCredit>talkkonnect by Suvir Kumar (Released under the MPL License)</footerCredit>
+    <graphicsVersion>1.09</graphicsVersion>
+  </captions>
+</UIConfig>

@@ -14,15 +14,15 @@ type ChannelTreeNode struct {
 	Active    bool
 }
 
-func channelDisplayName(name string) string {
+func channelDisplayName(name, emptyPlaceholder string) string {
 	if name == "" {
-		return "—"
+		return emptyPlaceholder
 	}
 	return name
 }
 
-func inactiveChannelLabel(n ChannelTreeNode) string {
-	return fmt.Sprintf("%s (%d)", channelDisplayName(n.Name), n.UserCount)
+func inactiveChannelLabel(n ChannelTreeNode, emptyPlaceholder string) string {
+	return fmt.Sprintf("%s (%d)", channelDisplayName(n.Name, emptyPlaceholder), n.UserCount)
 }
 
 // partitionChannelTree pulls the active channel out of the hierarchy for pinned display.
@@ -41,10 +41,13 @@ func partitionChannelTree(nodes []ChannelTreeNode) (active *ChannelTreeNode, ina
 	return active, inactive
 }
 
-func drawChannelTree(img draw.Image, panel image.Rectangle, nodes []ChannelTreeNode) {
+func drawChannelTree(img draw.Image, panel image.Rectangle, nodes []ChannelTreeNode, cfg *UIConfig) {
 	x := panel.Min.X + 8
-	y := panel.Min.Y + 30
+	y := panel.Min.Y + cfg.Layout.PanelContentTop
 	maxY := panel.Max.Y - 8
+	empty := cfg.Captions.EmptyPlaceholder
+	pal := cfg.Palette
+	caps := cfg.Captions
 	const (
 		activeRowH   = 14
 		inactiveRowH = 16
@@ -56,17 +59,17 @@ func drawChannelTree(img draw.Image, panel image.Rectangle, nodes []ChannelTreeN
 		if y > maxY {
 			return
 		}
-		drawText(img, x, y+13, channelDisplayName(active.Name), colGreen, sizeChannelActive)
+		drawText(img, x, y+13, channelDisplayName(active.Name, empty), pal.Green, sizeChannelActive)
 		y += activeRowH
 	}
 
 	for _, n := range rest {
 		if y > maxY {
-			drawText(img, panel.Max.X-24, maxY, "▼", colGreyText, sizeSmall)
+			drawText(img, panel.Max.X-24, maxY, caps.ScrollIndicator, pal.GreyText, sizeSmall)
 			return
 		}
 		indent := x + n.Depth*14
-		drawText(img, indent, y+14, inactiveChannelLabel(n), colGreyText, sizeSmall)
+		drawText(img, indent, y+14, inactiveChannelLabel(n, empty), pal.GreyText, sizeSmall)
 		y += inactiveRowH
 	}
 }

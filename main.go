@@ -17,8 +17,16 @@ func main() {
 	fbDevice := flag.String("fb", "/dev/fb0", "Linux framebuffer device")
 	fontPath := flag.String("font", "DejaVuSans.ttf", "Latin font (DejaVu Sans)")
 	thaiFontPath := flag.String("thai-font", defaultThaiFontPath(), "Thai font (Noto Sans Thai)")
+	configPath := flag.String("config", "theme.xml", "path to UI theme XML file")
 	vt := flag.Int("vt", 1, "virtual terminal attached to the display")
 	flag.Parse()
+
+	uiConfig, err := loadConfig(*configPath)
+	if err != nil {
+		fmt.Printf("Error loading theme: %v\n", err)
+		return
+	}
+	initAssetTiles(uiConfig)
 
 	fb, err := openLinuxFramebuffer(*fbDevice)
 	if err != nil {
@@ -27,7 +35,7 @@ func main() {
 	}
 	defer fb.close()
 
-	releaseDisplay, err := acquireLinuxDisplay(fb, *vt)
+	releaseDisplay, err := acquireLinuxDisplay(fb, *vt, uiConfig.Palette.Background)
 	if err != nil {
 		fmt.Printf("Warning: could not hide Linux console: %v\n", err)
 		fmt.Println("Try: sudo sh -c 'echo 0 > /sys/class/vtconsole/vtcon1/bind'")
@@ -92,7 +100,7 @@ func main() {
 
 			display.Elapsed, display.ActivityEndTime = elapsed.update(now, display.Transmitting, display.Receiving)
 
-			renderFrame(frame, fb.width, fb.height, display, signalLevel(display), talkkonnectOK, now)
+			renderFrame(frame, fb.width, fb.height, display, signalLevel(display), talkkonnectOK, now, uiConfig)
 			if tk != nil && talkkonnectOK {
 				releaseChannelTreeNodes(display.ChannelTree)
 			}

@@ -41,28 +41,6 @@ type DisplayState struct {
 	TalkkonnectVersion string
 }
 
-const graphicsVersion = "1.08"
-
-var (
-	colBlack       = color.RGBA{0, 0, 0, 255}
-	colBackground  = color.RGBA{14, 14, 16, 255}
-	colPanel       = color.RGBA{24, 26, 30, 255}
-	colPanelHead   = color.RGBA{36, 42, 52, 255}
-	colPanelEdge   = color.RGBA{58, 72, 92, 255}
-	colBlue        = color.RGBA{72, 132, 196, 255}
-	colBlueDim     = color.RGBA{44, 68, 98, 255}
-	colGreyText    = color.RGBA{170, 174, 182, 255}
-	colWhite       = color.RGBA{236, 238, 242, 255}
-	colOrange      = color.RGBA{232, 118, 38, 255}
-	colRed         = color.RGBA{210, 55, 65, 255}
-	colGreen       = color.RGBA{62, 190, 98, 255}
-	colVUDim       = color.RGBA{20, 22, 26, 255}
-	colVUGreen     = color.RGBA{50, 170, 70, 255}
-	colVUYellow    = color.RGBA{210, 190, 60, 255}
-	colLightYellow = color.RGBA{200, 150, 60, 255}
-	colVURed       = color.RGBA{200, 55, 50, 255}
-)
-
 var channelUserPool = sync.Pool{
 	New: func() any {
 		s := make([]ChannelUser, 0, 32)
@@ -104,24 +82,24 @@ func strokeRect(img draw.Image, r image.Rectangle, col color.Color, w int) {
 	}
 }
 
-func drawPanel(img draw.Image, r image.Rectangle) {
-	fillRect(img, r, colPanel)
-	strokeRect(img, r, colPanelEdge, 1)
+func drawPanel(img draw.Image, r image.Rectangle, cfg *UIConfig) {
+	fillRect(img, r, cfg.Palette.Panel)
+	strokeRect(img, r, cfg.Palette.PanelEdge, 1)
 }
 
-func drawColumnHeader(img draw.Image, r image.Rectangle, title string) {
-	fillRect(img, r, colPanelHead)
-	strokeRect(img, r, colBlue, 1)
-	drawText(img, r.Min.X+8, r.Min.Y+18, title, colBlue, sizeLabel)
+func drawColumnHeader(img draw.Image, r image.Rectangle, title string, cfg *UIConfig) {
+	fillRect(img, r, cfg.Palette.PanelHead)
+	strokeRect(img, r, cfg.Palette.Blue, 1)
+	drawText(img, r.Min.X+8, r.Min.Y+18, title, cfg.Palette.Blue, sizeLabel)
 }
 
-func drawOutlinedButton(img draw.Image, r image.Rectangle, label string, active bool) {
-	c := colPanelEdge
+func drawOutlinedButton(img draw.Image, r image.Rectangle, label string, active bool, cfg *UIConfig) {
+	c := cfg.Palette.PanelEdge
 	if active {
-		c = colGreen
+		c = cfg.Palette.Green
 	}
 	strokeRect(img, r, c, 2)
-	drawText(img, r.Min.X+10, r.Min.Y+(r.Dy()+12)/2, label, colGreyText, sizeLabel)
+	drawText(img, r.Min.X+10, r.Min.Y+(r.Dy()+12)/2, label, cfg.Palette.GreyText, sizeLabel)
 }
 
 func isSpeakingStatus(status string) bool {
@@ -173,23 +151,23 @@ func promoteTransmittingUser(users []ChannelUser, selfName string) (out []Channe
 	return out, pooled
 }
 
-func userStatusColor(status string) color.Color {
+func userStatusColor(status string, cfg *UIConfig) color.Color {
 	switch {
 	case isSpeakingStatus(status):
-		return colGreen
+		return cfg.Palette.Green
 	case strings.EqualFold(status, "whisper"):
-		return colGreyText
+		return cfg.Palette.GreyText
 	case strings.EqualFold(status, "muted"):
-		return colRed
+		return cfg.Palette.Red
 	default:
-		return colGreyText
+		return cfg.Palette.GreyText
 	}
 }
 
-func drawUserIcon(img draw.Image, x, y int, status string, transmittingSelf bool) {
+func drawUserIcon(img draw.Image, x, y int, status string, transmittingSelf bool, cfg *UIConfig) {
 	rgba, ok := img.(*image.RGBA)
 	if !ok {
-		drawUserIconFallback(img, x, y, status, transmittingSelf)
+		drawUserIconFallback(img, x, y, status, transmittingSelf, cfg)
 		return
 	}
 	var tile []byte
@@ -204,32 +182,32 @@ func drawUserIcon(img draw.Image, x, y int, status string, transmittingSelf bool
 	blitRGBATile(rgba, x+2, y+5, userIconW, userIconH, tile)
 }
 
-func drawUserIconFallback(img draw.Image, x, y int, status string, transmittingSelf bool) {
+func drawUserIconFallback(img draw.Image, x, y int, status string, transmittingSelf bool, cfg *UIConfig) {
 	switch {
 	case transmittingSelf:
-		fillRect(img, image.Rect(x+2, y+5, x+9, y+15), colGreen)
+		fillRect(img, image.Rect(x+2, y+5, x+9, y+15), cfg.Palette.Green)
 	case isSpeakingStatus(status):
-		fillRect(img, image.Rect(x+2, y+5, x+9, y+15), colGreen)
+		fillRect(img, image.Rect(x+2, y+5, x+9, y+15), cfg.Palette.Green)
 	case strings.EqualFold(status, "muted"):
-		fillRect(img, image.Rect(x+2, y+5, x+9, y+15), colRed)
+		fillRect(img, image.Rect(x+2, y+5, x+9, y+15), cfg.Palette.Red)
 	default:
-		fillRect(img, image.Rect(x+2, y+5, x+9, y+15), colPanel)
+		fillRect(img, image.Rect(x+2, y+5, x+9, y+15), cfg.Palette.Panel)
 	}
 }
 
-func vuSegmentColor(position float64) color.Color {
+func vuSegmentColor(position float64, cfg *UIConfig) color.Color {
 	if position > 0.72 {
-		return colVURed
+		return cfg.Palette.VURed
 	}
 	if position > 0.5 {
-		return colVUYellow
+		return cfg.Palette.VUYellow
 	}
-	return colVUGreen
+	return cfg.Palette.VUGreen
 }
 
-func drawSegmentedHorizontalTrack(img draw.Image, x, trackY, w, trackH int, borderCol color.Color, level float64) {
+func drawSegmentedHorizontalTrack(img draw.Image, x, trackY, w, trackH int, borderCol color.Color, level float64, cfg *UIConfig) {
 	track := image.Rect(x, trackY, x+w, trackY+trackH)
-	fillRect(img, track, colVUDim)
+	fillRect(img, track, cfg.Palette.VUDim)
 	strokeRect(img, track, borderCol, 1)
 	if level < 0 {
 		level = 0
@@ -252,63 +230,63 @@ func drawSegmentedHorizontalTrack(img draw.Image, x, trackY, w, trackH int, bord
 		sx := x + 2 + s*(segW+gap)
 		segRect := image.Rect(sx, trackY+2, sx+segW, trackY+trackH-2)
 		if s < lit {
-			fillRect(img, segRect, vuSegmentColor(float64(s+1)/float64(segments)))
+			fillRect(img, segRect, vuSegmentColor(float64(s+1)/float64(segments), cfg))
 		}
 	}
 }
 
-func drawSegmentedHorizontalBar(img draw.Image, x, y, w, trackH int, label string, borderCol color.Color, level float64) int {
-	drawText(img, x, y+10, label, colGreyText, sizeSmall)
+func drawSegmentedHorizontalBar(img draw.Image, x, y, w, trackH int, label string, borderCol color.Color, level float64, cfg *UIConfig) int {
+	drawText(img, x, y+10, label, cfg.Palette.GreyText, sizeSmall)
 	trackY := y + 14
-	drawSegmentedHorizontalTrack(img, x, trackY, w, trackH, borderCol, level)
+	drawSegmentedHorizontalTrack(img, x, trackY, w, trackH, borderCol, level, cfg)
 	return trackY + trackH + 6
 }
 
-func drawVolumeBar(img draw.Image, x, y, w, trackH int, volume int, muted bool) int {
-	labelCol := colWhite
-	if muted {
-		labelCol = colRed
-	}
+func drawVolumeBar(img draw.Image, x, y, w, trackH int, volume int, muted bool, cfg *UIConfig) int {
+	caps := cfg.Captions
 	if !muted {
-		drawText(img, x, y+10, "Speaker Volume", labelCol, sizeSmall)
-		drawTextRight(img, x+w, y+10, fmt.Sprintf("%d", volume), colWhite, sizeSmall)
-
+		drawText(img, x, y+10, caps.SpeakerVolumeLabel, cfg.Palette.White, sizeSmall)
+		drawTextRight(img, x+w, y+10, fmt.Sprintf("%d", volume), cfg.Palette.White, sizeSmall)
 	} else {
-		drawText(img, x, y+10, "Speaker (Muted)", colRed, sizeSmall)
+		drawText(img, x, y+10, caps.SpeakerMutedLabel, cfg.Palette.Red, sizeSmall)
 	}
 	trackY := y + 14
-	drawSegmentedHorizontalTrack(img, x, trackY, w, trackH, colBlueDim, float64(volume)/100.0)
+	drawSegmentedHorizontalTrack(img, x, trackY, w, trackH, cfg.Palette.BlueDim, float64(volume)/100.0, cfg)
 	return trackY + trackH + 6
 }
 
-func renderFrame(img draw.Image, width, height int, st DisplayState, signalBars int, talkkonnectOK bool, now time.Time) {
-	fillRect(img, img.Bounds(), colBackground)
+func renderFrame(img draw.Image, width, height int, st DisplayState, signalBars int, talkkonnectOK bool, now time.Time, cfg *UIConfig) {
+	lay := cfg.Layout
+	caps := cfg.Captions
+	pal := cfg.Palette
 
-	headerH := 54
-	footerH := 34
-	margin := 6
-	gap := 6
+	fillRect(img, img.Bounds(), pal.Background)
+
+	headerH := lay.HeaderHeight
+	footerH := lay.FooterHeight
+	margin := lay.Margin
+	gap := lay.Gap
 
 	// --- Header ---
-	fillRect(img, image.Rect(0, 0, width, headerH), colPanel)
-	strokeRect(img, image.Rect(0, 0, width, headerH), colPanelEdge, 1)
+	fillRect(img, image.Rect(0, 0, width, headerH), pal.Panel)
+	strokeRect(img, image.Rect(0, 0, width, headerH), pal.PanelEdge, 1)
 
-	drawText(img, margin, 18, "HostName: "+st.DeviceName, colGreyText, sizeLabel)
-	drawText(img, margin, 36, "HostIP: "+st.DeviceIP, colGreyText, sizeLabel)
+	drawText(img, margin, 18, caps.HostNameLabel+" "+st.DeviceName, pal.GreyText, sizeLabel)
+	drawText(img, margin, 36, caps.HostIPLabel+" "+st.DeviceIP, pal.GreyText, sizeLabel)
 
 	srvTitle := st.ServerName
 	if srvTitle == "" {
-		srvTitle = "Not Connected"
+		srvTitle = caps.NotConnected
 	}
 	mumbleUser := strings.TrimSpace(st.MumbleUsername)
 	if mumbleUser == "" {
-		mumbleUser = "—"
+		mumbleUser = caps.EmptyPlaceholder
 	}
 
-	drawText(img, width/2-120, 18, "Name: "+srvTitle, colGreyText, sizeLabel)
-	drawText(img, width/2-120, 32, "IP: "+st.ServerIP, colGreyText, sizeLabel)
-	userLine := "USER: " + mumbleUser
-	drawTextRight(img, width/2+44, 48, userLine, colGreyText, sizeLabel)
+	drawText(img, width/2-lay.ServerInfoCenterOffset, 18, caps.ServerNameLabel+" "+srvTitle, pal.GreyText, sizeLabel)
+	drawText(img, width/2-lay.ServerInfoCenterOffset, 32, caps.ServerIPLabel+" "+st.ServerIP, pal.GreyText, sizeLabel)
+	userLine := caps.UserPrefix + " " + mumbleUser
+	drawTextRight(img, width/2+lay.UserLineCenterOffset, 48, userLine, pal.GreyText, sizeLabel)
 	//	drawTextRight(img, width-margin, 18, userLine, colWhite, sizeLabel)
 
 	// --- Main 3 columns ---
@@ -320,8 +298,8 @@ func renderFrame(img draw.Image, width, height int, st DisplayState, signalBars 
 	col3 := image.Rect(margin+colW*2+gap*2, bodyTop, width-margin, bodyBottom)
 
 	// Left: CHANNELS (tree)
-	drawPanel(img, col1)
-	drawColumnHeader(img, image.Rect(col1.Min.X, col1.Min.Y, col1.Max.X, col1.Min.Y+24), "Channel List")
+	drawPanel(img, col1, cfg)
+	drawColumnHeader(img, image.Rect(col1.Min.X, col1.Min.Y, col1.Max.X, col1.Min.Y+lay.ColumnHeaderHeight), caps.ChannelListTitle, cfg)
 	tree := st.ChannelTree
 	if len(tree) == 0 && st.Channel != "" {
 		tree = []ChannelTreeNode{{
@@ -331,13 +309,13 @@ func renderFrame(img draw.Image, width, height int, st DisplayState, signalBars 
 			Active:    true,
 		}}
 	}
-	drawChannelTree(img, col1, tree)
+	drawChannelTree(img, col1, tree, cfg)
 
 	// Middle: USERS IN CHANNEL
-	drawPanel(img, col2)
-	userTitle := fmt.Sprintf("%d Users In Connected Channel", st.UserCount)
-	drawColumnHeader(img, image.Rect(col2.Min.X, col2.Min.Y, col2.Max.X, col2.Min.Y+24), userTitle)
-	listTop := col2.Min.Y + 30
+	drawPanel(img, col2, cfg)
+	userTitle := fmt.Sprintf(caps.UsersInChannelTitle, st.UserCount)
+	drawColumnHeader(img, image.Rect(col2.Min.X, col2.Min.Y, col2.Max.X, col2.Min.Y+lay.ColumnHeaderHeight), userTitle, cfg)
+	listTop := col2.Min.Y + lay.PanelContentTop
 	listMaxY := col2.Max.Y - 10
 	users := st.Users
 	if st.Transmitting {
@@ -361,88 +339,87 @@ func renderFrame(img draw.Image, width, height int, st DisplayState, signalBars 
 		if y+rowH > listMaxY {
 			break
 		}
-		drawUserIcon(img, col2.Min.X+10, y, u.Status, txSelf)
+		drawUserIcon(img, col2.Min.X+10, y, u.Status, txSelf, cfg)
 		line := u.Name
-		lineCol := userStatusColor(u.Status)
+		lineCol := userStatusColor(u.Status, cfg)
 		if txSelf {
-			lineCol = colGreen
+			lineCol = pal.Green
 		}
 		drawText(img, col2.Min.X+28, y+rowH-8, line, lineCol, textSize)
 		y += rowH
 		shown++
 	}
 	if len(st.Users) > shown {
-		drawText(img, col2.Max.X-30, col2.Max.Y-10, "▼", colGreyText, sizeSmall)
+		drawText(img, col2.Max.X-30, col2.Max.Y-10, caps.ScrollIndicator, pal.GreyText, sizeSmall)
 	}
 
 	// Right: STATUS & MODE
-	drawPanel(img, col3)
-	drawColumnHeader(img, image.Rect(col3.Min.X, col3.Min.Y, col3.Max.X, col3.Min.Y+24), "System Status & Communication Mode")
+	drawPanel(img, col3, cfg)
+	drawColumnHeader(img, image.Rect(col3.Min.X, col3.Min.Y, col3.Max.X, col3.Min.Y+lay.ColumnHeaderHeight), caps.StatusPanelTitle, cfg)
 
 	txrx := st.TXRXStatus
-	txCol := colBlack
-	fillColor := colLightYellow
+	txCol := pal.Black
+	fillColor := pal.LightYellow
 
 	if txrx == "" {
-		txrx = "O N L I N E"
-		fillColor = colLightYellow
+		txrx = caps.OnlineStatus
+		fillColor = pal.LightYellow
 	}
 	if txrx == "Idle" {
-		txrx = "O N L I N E"
-		fillColor = colLightYellow
+		txrx = caps.OnlineStatus
+		fillColor = pal.LightYellow
 	}
 	if st.Transmitting {
-		txCol = colBlack
-		fillColor = colVURed
+		txCol = pal.Black
+		fillColor = pal.VURed
 	}
 	if st.Receiving {
-		txCol = colBlack
-		fillColor = colVUGreen
+		txCol = pal.Black
+		fillColor = pal.VUGreen
 	}
 
 	statusBox := image.Rect(col3.Min.X+8, col3.Min.Y+34, col3.Max.X-8, col3.Min.Y+58)
-	fillRect(img, statusBox, colVUDim)
-	strokeRect(img, statusBox, colPanelEdge, 2)
+	fillRect(img, statusBox, pal.VUDim)
+	strokeRect(img, statusBox, pal.PanelEdge, 2)
 	fillRect(img, statusBox, fillColor)
-	drawText(img, col3.Min.X+14, col3.Min.Y+52, ""+txrx, txCol, sizeBody)
-	drawTalkkonnectStatusLED(img, statusBox, talkkonnectOK, now)
+	drawText(img, col3.Min.X+14, col3.Min.Y+52, txrx, txCol, sizeBody)
+	drawTalkkonnectStatusLED(img, statusBox, talkkonnectOK, now, cfg)
 	modeY := col3.Min.Y + 66
-	drawOutlinedButton(img, image.Rect(col3.Min.X+8, modeY, col3.Min.X+col3.Dx()/2-2, modeY+28), "Broadcast", st.Mode != "whisper")
-	drawOutlinedButton(img, image.Rect(col3.Min.X+col3.Dx()/2+2, modeY, col3.Max.X-8, modeY+28), "Whisper", st.Mode == "whisper")
+	drawOutlinedButton(img, image.Rect(col3.Min.X+8, modeY, col3.Min.X+col3.Dx()/2-2, modeY+28), caps.BroadcastLabel, st.Mode != "whisper", cfg)
+	drawOutlinedButton(img, image.Rect(col3.Min.X+col3.Dx()/2+2, modeY, col3.Max.X-8, modeY+28), caps.WhisperLabel, st.Mode == "whisper", cfg)
 	speaker := st.LastSpeaker
 	if speaker == "" {
 		speaker = "-"
 	}
-	drawText(img, col3.Min.X+10, modeY+48, "Speaking: "+speaker, colGreyText, sizeLabel)
+	drawText(img, col3.Min.X+10, modeY+48, caps.SpeakingLabel+" "+speaker, pal.GreyText, sizeLabel)
 	elapsed := st.Elapsed
 	if elapsed == "" {
 		elapsed = "-"
 	}
-	drawText(img, col3.Min.X+10, modeY+64, "Elapsed  : "+elapsed, colGreyText, sizeLabel)
+	drawText(img, col3.Min.X+10, modeY+64, caps.ElapsedLabel+" "+elapsed, pal.GreyText, sizeLabel)
 	activityEnd := st.ActivityEndTime
-	drawText(img, col3.Min.X+10, modeY+80, "Last Activity  : "+activityEnd, colGreyText, sizeLabel)
+	drawText(img, col3.Min.X+10, modeY+80, caps.LastActivityLabel+" "+activityEnd, pal.GreyText, sizeLabel)
 
 	barsX := col3.Min.X + 8
 	barsW := col3.Dx() - 16
-	barTrackH := 12
+	barTrackH := lay.VolumeBarTrackHeight
 
-	barsY := modeY + 250
+	barsY := modeY + lay.SignalBarsYOffset
 
-	barsY = drawSignalMeter(img, barsX, barsY, barsW, signalBars)
+	barsY = drawSignalMeter(img, barsX, barsY, barsW, signalBars, cfg)
 	volume := st.Volume
 	if st.Muted {
 		volume = 0
 	}
-	drawVolumeBar(img, barsX, barsY, barsW, barTrackH, volume, st.Muted)
+	drawVolumeBar(img, barsX, barsY, barsW, barTrackH, volume, st.Muted, cfg)
 
 	// --- Footer ---
-	fillRect(img, image.Rect(0, height-footerH, width, height), colPanel)
-	strokeRect(img, image.Rect(0, height-footerH, width, height), colPanelEdge, 1)
-	footerVersion := fmt.Sprintf("talKKonnect %s  Graphics %s", talkkonnectVersionLabel(st.TalkkonnectVersion), graphicsVersion)
-	footerText := "talkkonnect by Suvir Kumar (Released under the MPL License)"
-	drawText(img, 5, height-8, footerVersion, colGreyText, sizeLabel)
-	drawText(img, 240, height-8, footerText, colGreyText, sizeLabel)
-	drawText(img, width-margin-160, height-8, now.Format(time.ANSIC), colGreyText, sizeLabel)
+	fillRect(img, image.Rect(0, height-footerH, width, height), pal.Panel)
+	strokeRect(img, image.Rect(0, height-footerH, width, height), pal.PanelEdge, 1)
+	footerVersion := fmt.Sprintf(caps.FooterVersionFormat, talkkonnectVersionLabel(st.TalkkonnectVersion, caps.EmptyPlaceholder), caps.GraphicsVersion)
+	drawText(img, lay.FooterVersionX, height-8, footerVersion, pal.GreyText, sizeLabel)
+	drawText(img, lay.FooterTextX, height-8, caps.FooterCredit, pal.GreyText, sizeLabel)
+	drawText(img, width-margin-lay.FooterClockRightMargin, height-8, now.Format(time.ANSIC), pal.GreyText, sizeLabel)
 }
 
 func mockDisplayState() DisplayState {
@@ -486,10 +463,10 @@ func mockDisplayState() DisplayState {
 	}
 }
 
-func talkkonnectVersionLabel(version string) string {
+func talkkonnectVersionLabel(version, emptyPlaceholder string) string {
 	version = strings.TrimSpace(version)
 	if version == "" {
-		return "—"
+		return emptyPlaceholder
 	}
 	return version
 }

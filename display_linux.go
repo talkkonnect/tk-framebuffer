@@ -4,6 +4,7 @@ package main
 
 import (
 	"fmt"
+	"image/color"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -67,7 +68,7 @@ func unbindFramebufferConsole() func() {
 
 // acquireLinuxDisplay hides the login/console on the attached screen so framebuffer
 // writes are visible. Returns a cleanup func that restores the console.
-func acquireLinuxDisplay(fb *linuxFramebuffer, vt int) (func(), error) {
+func acquireLinuxDisplay(fb *linuxFramebuffer, vt int, bg color.RGBA) (func(), error) {
 	if vt <= 0 {
 		vt = 1
 	}
@@ -86,7 +87,7 @@ func acquireLinuxDisplay(fb *linuxFramebuffer, vt int) (func(), error) {
 	}
 
 	// Paint immediately so the screen changes before font rendering starts.
-	fb.fillSolid(colBackground)
+	fb.fillSolid(bg)
 
 	cleanup := func() {
 		if tty, err := os.OpenFile(ttyPath, os.O_RDWR, 0); err == nil {

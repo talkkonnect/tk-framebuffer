@@ -14,8 +14,6 @@ const (
 
 var signalBarFractions = [5]float64{0.20, 0.40, 0.60, 0.80, 1.00}
 
-var colSignalInactive = color.RGBA{42, 46, 54, 255}
-
 // signalLevel returns 0..5 active bars (full scale on TX or RX).
 func signalLevel(st DisplayState) int {
 	if st.Transmitting || st.Receiving {
@@ -24,8 +22,8 @@ func signalLevel(st DisplayState) int {
 	return 0
 }
 
-func signalBarColor(barIndex int) color.Color {
-	return vuSegmentColor(signalBarFractions[barIndex])
+func signalBarColor(barIndex int, cfg *UIConfig) color.Color {
+	return vuSegmentColor(signalBarFractions[barIndex], cfg)
 }
 
 func signalBarLayout(availableW int) (barW, gap int) {
@@ -43,7 +41,7 @@ func signalBarLayout(availableW int) (barW, gap int) {
 	return barW, gap
 }
 
-func drawSignalBars(img draw.Image, x, baselineY, availableW, activeBars int) {
+func drawSignalBars(img draw.Image, x, baselineY, availableW, activeBars int, cfg *UIConfig) {
 	barW, gap := signalBarLayout(availableW)
 	for i := 0; i < 5; i++ {
 		barH := int(float64(signalMaxBarH) * signalBarFractions[i])
@@ -51,9 +49,9 @@ func drawSignalBars(img draw.Image, x, baselineY, availableW, activeBars int) {
 			barH = 1
 		}
 		barY := baselineY - barH + 1
-		col := color.Color(colSignalInactive)
+		col := color.Color(cfg.Palette.SignalInactive)
 		if i < activeBars {
-			col = signalBarColor(i)
+			col = signalBarColor(i, cfg)
 		}
 		fillRect(img, image.Rect(x, barY, x+barW, baselineY+1), col)
 		x += barW + gap
@@ -62,11 +60,11 @@ func drawSignalBars(img draw.Image, x, baselineY, availableW, activeBars int) {
 
 // drawSignalMeter renders a compact ascending bar graph.
 // Returns the Y coordinate for the next UI element below it.
-func drawSignalMeter(img draw.Image, x, y, w, activeBars int) int {
-	drawText(img, x, y+10, "Signal", colGreyText, sizeSmall)
+func drawSignalMeter(img draw.Image, x, y, w, activeBars int, cfg *UIConfig) int {
+	drawText(img, x, y+10, cfg.Captions.SignalLevelLabel, cfg.Palette.GreyText, sizeSmall)
 
 	baselineY := y + 12 + signalMaxBarH - 1
-	drawSignalBars(img, x, baselineY, w, activeBars)
+	drawSignalBars(img, x, baselineY, w, activeBars, cfg)
 
 	return baselineY + 7
 }
