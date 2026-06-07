@@ -41,7 +41,7 @@ type DisplayState struct {
 	TalkkonnectVersion string
 }
 
-const graphicsVersion = "1.07"
+const graphicsVersion = "1.08"
 
 var (
 	colBlack       = color.RGBA{0, 0, 0, 255}
@@ -264,11 +264,6 @@ func drawSegmentedHorizontalBar(img draw.Image, x, y, w, trackH int, label strin
 	return trackY + trackH + 6
 }
 
-func drawSignalBar(img draw.Image, x, y, w, trackH int, level float64) int {
-	drawTextRight(img, x+w, y+10, fmt.Sprintf("%d", int(level*100)), colWhite, sizeSmall)
-	return drawSegmentedHorizontalBar(img, x, y, w, trackH, "Signal", colPanelEdge, level)
-}
-
 func drawVolumeBar(img draw.Image, x, y, w, trackH int, volume int, muted bool) int {
 	labelCol := colWhite
 	if muted {
@@ -286,7 +281,7 @@ func drawVolumeBar(img draw.Image, x, y, w, trackH int, volume int, muted bool) 
 	return trackY + trackH + 6
 }
 
-func renderFrame(img draw.Image, width, height int, st DisplayState, signal float64, talkkonnectOK bool, now time.Time) {
+func renderFrame(img draw.Image, width, height int, st DisplayState, signalBars int, talkkonnectOK bool, now time.Time) {
 	fillRect(img, img.Bounds(), colBackground)
 
 	headerH := 54
@@ -433,7 +428,7 @@ func renderFrame(img draw.Image, width, height int, st DisplayState, signal floa
 
 	barsY := modeY + 250
 
-	barsY = drawSignalBar(img, barsX, barsY, barsW, barTrackH, signal)
+	barsY = drawSignalMeter(img, barsX, barsY, barsW, signalBars)
 	volume := st.Volume
 	if st.Muted {
 		volume = 0
