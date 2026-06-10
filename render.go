@@ -38,6 +38,8 @@ type DisplayState struct {
 	Transmitting       bool
 	Offline            bool
 	MumbleUsername     string
+	LastMessageSender  string
+	LastMessageText    string
 	TalkkonnectVersion string
 }
 
@@ -400,6 +402,12 @@ func renderFrame(img draw.Image, width, height int, st DisplayState, signalBars 
 	activityEnd := st.ActivityEndTime
 	drawText(img, col3.Min.X+10, modeY+80, caps.LastActivityLabel+" "+activityEnd, pal.GreyText, sizeLabel)
 
+	msgTop := modeY + 98
+	msgBottom := modeY + lay.SignalBarsYOffset - 6
+	if msgBottom > msgTop+20 {
+		drawMumbleMessagePanel(img, image.Rect(col3.Min.X+8, msgTop, col3.Max.X-8, msgBottom), st, cfg)
+	}
+
 	barsX := col3.Min.X + 8
 	barsW := col3.Dx() - 16
 	barTrackH := lay.VolumeBarTrackHeight
@@ -459,6 +467,8 @@ func mockDisplayState() DisplayState {
 		Activity:           "idle",
 		Connected:          true,
 		MumbleUsername:     "talkkonnect-demo",
+		LastMessageSender:  "Zoran",
+		LastMessageText:    "สวัสดีครับ พบกันที่ช่อง General ใน 5 นาที",
 		TalkkonnectVersion: "4.06.03",
 	}
 }
@@ -487,6 +497,8 @@ func offlineDisplayState() DisplayState {
 	st.Offline = true
 	st.Connected = false
 	st.MumbleUsername = ""
+	st.LastMessageSender = ""
+	st.LastMessageText = ""
 	st.RTT = ""
 	return st
 }

@@ -23,6 +23,11 @@ type uiChannelNode struct {
 	Active    bool   `json:"active"`
 }
 
+type uiLastMessage struct {
+	Sender string `json:"sender"`
+	Text   string `json:"text"`
+}
+
 type talkkonnectStatus struct {
 	Connected     bool            `json:"connected"`
 	Transmitting  bool            `json:"transmitting"`
@@ -34,6 +39,7 @@ type talkkonnectStatus struct {
 	ChannelTree   []uiChannelNode `json:"channelTree"`
 	Receiving     bool            `json:"receiving"`
 	LastSpeaker   string          `json:"lastSpeaker"`
+	LastMessage   uiLastMessage   `json:"lastMessage"`
 	RXVolume      int             `json:"rxVolume"`
 	Muted         bool            `json:"muted"`
 	InternetRadio struct {
@@ -136,6 +142,8 @@ func (st talkkonnectStatus) toDisplayState() DisplayState {
 		Transmitting:       st.Transmitting,
 		Muted:              st.Muted,
 		MumbleUsername:     strings.TrimSpace(st.MumbleUsername),
+		LastMessageSender:  strings.TrimSpace(st.LastMessage.Sender),
+		LastMessageText:    strings.TrimSpace(st.LastMessage.Text),
 		Mode:               "normal",
 		RTT:                "--",
 		TalkkonnectVersion: strings.TrimSpace(st.Version),

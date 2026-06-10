@@ -7,6 +7,7 @@ import (
 	"image/color"
 	"image/draw"
 	"os"
+	"strings"
 	"unicode"
 
 	"golang.org/x/image/font"
@@ -203,6 +204,98 @@ func drawText(img draw.Image, x, y int, text string, col color.Color, size fontS
 		d.Face = faceFor(size, isThaiRune(r))
 		d.DrawString(string(r))
 	}
+}
+
+func measureTextWidth(text string, size fontSize) int {
+	if text == "" {
+		return 0
+	}
+	if !thaiOK || !stringNeedsThai(text) {
+		f := faceFor(size, false)
+		return font.MeasureString(f, text).Ceil()
+	}
+	w := 0
+	for _, r := range text {
+		f := faceFor(size, isThaiRune(r))
+		w += font.MeasureString(f, string(r)).Ceil()
+	}
+	return w
+}
+
+func wrapTextLines(text string, maxWidth int, size fontSize) []string {
+	text = strings.TrimSpace(text)
+	if text == "" || maxWidth <= 0 {
+		return nil
+	}
+
+	var lines []string
+	for _, paragraph := range strings.Split(text, "\n") {
+		paragraph = strings.TrimSpace(paragraph)
+		if paragraph == "" {
+			continue
+		}
+		lines = append(lines, wrapParagraph(paragraph, maxWidth, size)...)
+	}
+	return lines
+}
+
+func wrapParagraph(text string, maxWidth int, size fontSize) []string {
+	words := strings.Fields(text)
+	if len(words) == 0 {
+		return nil
+	}
+
+	var lines []string
+	line := words[0]
+	if measureTextWidth(line, size) > maxWidth {
+		lines = append(lines, breakLongWord(line, maxWidth, size)...)
+		line = ""
+	}
+
+	for _, word := range words[1:] {
+		if line == "" {
+			if measureTextWidth(word, size) > maxWidth {
+				lines = append(lines, breakLongWord(word, maxWidth, size)...)
+				continue
+			}
+			line = word
+			continue
+		}
+		candidate := line + " " + word
+		if measureTextWidth(candidate, size) <= maxWidth {
+			line = candidate
+			continue
+		}
+		lines = append(lines, line)
+		if measureTextWidth(word, size) > maxWidth {
+			lines = append(lines, breakLongWord(word, maxWidth, size)...)
+			line = ""
+		} else {
+			line = word
+		}
+	}
+	if line != "" {
+		lines = append(lines, line)
+	}
+	return lines
+}
+
+func breakLongWord(word string, maxWidth int, size fontSize) []string {
+	var lines []string
+	runes := []rune(word)
+	start := 0
+	for start < len(runes) {
+		end := start + 1
+		for end <= len(runes) && measureTextWidth(string(runes[start:end]), size) <= maxWidth {
+			end++
+		}
+		if end == start+1 {
+			end++
+		}
+		lines = append(lines, string(runes[start:end-1]))
+		start = end - 1
+	}
+	return lines
 }
 
 // drawTextRight aligns the right edge of text with rightX (baseline y).

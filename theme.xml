@@ -52,12 +52,14 @@
     <speakingLabel>Speaking:</speakingLabel>
     <elapsedLabel>Elapsed  :</elapsedLabel>
     <lastActivityLabel>Last Activity  :</lastActivityLabel>
+    <messageFromFormat>From %s:</messageFromFormat>
+    <messageFromServerLabel>Server</messageFromServerLabel>
     <speakerVolumeLabel>Speaker Volume</speakerVolumeLabel>
     <speakerMutedLabel>Speaker (Muted)</speakerMutedLabel>
     <signalLevelLabel>Signal Level (RX/TX)</signalLevelLabel>
     <scrollIndicator> </scrollIndicator>
     <footerVersionFormat>talKKonnect %s  Graphics %s</footerVersionFormat>
     <footerCredit>talkkonnect by Suvir Kumar (Released under the MPL License)</footerCredit>
-    <graphicsVersion>1.09</graphicsVersion>
+    <graphicsVersion>1.10</graphicsVersion>
   </captions>
 </UIConfig>

@@ -96,6 +96,8 @@ type Captions struct {
 	SpeakingLabel       string `xml:"speakingLabel"`
 	ElapsedLabel        string `xml:"elapsedLabel"`
 	LastActivityLabel   string `xml:"lastActivityLabel"`
+	MessageFromFormat   string `xml:"messageFromFormat"`
+	MessageFromServerLabel string `xml:"messageFromServerLabel"`
 	SpeakerVolumeLabel  string `xml:"speakerVolumeLabel"`
 	SpeakerMutedLabel   string `xml:"speakerMutedLabel"`
 	SignalLevelLabel    string `xml:"signalLevelLabel"`
@@ -159,6 +161,8 @@ func defaultUIConfig() *UIConfig {
 			SpeakingLabel:       "Speaking:",
 			ElapsedLabel:        "Elapsed  :",
 			LastActivityLabel:   "Last Activity  :",
+			MessageFromFormat:   "From %s:",
+			MessageFromServerLabel: "Server",
 			SpeakerVolumeLabel:  "Speaker Volume",
 			SpeakerMutedLabel:   "Speaker (Muted)",
 			SignalLevelLabel:    "Signal Level (RX/TX)",
@@ -398,6 +402,12 @@ func mergeCaptions(base, overlay *Captions) {
 	}
 	if overlay.LastActivityLabel != "" {
 		base.LastActivityLabel = overlay.LastActivityLabel
+	}
+	if overlay.MessageFromFormat != "" {
+		base.MessageFromFormat = overlay.MessageFromFormat
+	}
+	if overlay.MessageFromServerLabel != "" {
+		base.MessageFromServerLabel = overlay.MessageFromServerLabel
 	}
 	if overlay.SpeakerVolumeLabel != "" {
 		base.SpeakerVolumeLabel = overlay.SpeakerVolumeLabel
