@@ -3,15 +3,17 @@ package main
 import (
 	"fmt"
 	"image"
+	"image/color"
 	"image/draw"
 )
 
 // ChannelTreeNode is one row in the server channel tree (inactive rows keep depth).
 type ChannelTreeNode struct {
-	Name      string
-	Depth     int
-	UserCount int
-	Active    bool
+	Name       string
+	Depth      int
+	UserCount  int
+	Active     bool
+	Accessible bool
 }
 
 func channelDisplayName(name, emptyPlaceholder string) string {
@@ -39,6 +41,13 @@ func partitionChannelTree(nodes []ChannelTreeNode) (active *ChannelTreeNode, ina
 		inactive = append(inactive, nodes[i])
 	}
 	return active, inactive
+}
+
+func channelInactiveColor(n ChannelTreeNode, pal ThemePalette) color.Color {
+	if n.Accessible {
+		return pal.GreyText
+	}
+	return pal.Orange
 }
 
 func drawChannelTree(img draw.Image, panel image.Rectangle, nodes []ChannelTreeNode, cfg *UIConfig) {
@@ -69,7 +78,7 @@ func drawChannelTree(img draw.Image, panel image.Rectangle, nodes []ChannelTreeN
 			return
 		}
 		indent := x + n.Depth*14
-		drawText(img, indent, y+14, inactiveChannelLabel(n, empty), pal.GreyText, sizeSmall)
+		drawText(img, indent, y+14, inactiveChannelLabel(n, empty), channelInactiveColor(n, pal), sizeSmall)
 		y += inactiveRowH
 	}
 }

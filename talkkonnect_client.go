@@ -17,10 +17,11 @@ type uiChannelUser struct {
 }
 
 type uiChannelNode struct {
-	Name      string `json:"name"`
-	Depth     int    `json:"depth"`
-	UserCount int    `json:"userCount"`
-	Active    bool   `json:"active"`
+	Name       string `json:"name"`
+	Depth      int    `json:"depth"`
+	UserCount  int    `json:"userCount"`
+	Active     bool   `json:"active"`
+	Accessible *bool  `json:"accessible"`
 }
 
 type uiLastMessage struct {
@@ -195,11 +196,16 @@ func mapChannelTree(from []uiChannelNode) []ChannelTreeNode {
 		if name == "" {
 			continue
 		}
+		accessible := true
+		if n.Accessible != nil {
+			accessible = *n.Accessible
+		}
 		out = append(out, ChannelTreeNode{
-			Name:      name,
-			Depth:     n.Depth,
-			UserCount: n.UserCount,
-			Active:    n.Active,
+			Name:       name,
+			Depth:      n.Depth,
+			UserCount:  n.UserCount,
+			Active:     n.Active,
+			Accessible: accessible,
 		})
 	}
 	return out

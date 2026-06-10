@@ -438,10 +438,10 @@ func mockDisplayState() DisplayState {
 		ServerIP:   "111.223.36.158",
 		Channel:    "HAM-CB",
 		ChannelTree: []ChannelTreeNode{
-			{Name: "Root", Depth: 0, UserCount: 0, Active: false},
-			{Name: "General", Depth: 1, UserCount: 14, Active: true},
-			{Name: "Support", Depth: 1, UserCount: 2, Active: false},
-			{Name: "Emergency", Depth: 1, UserCount: 0, Active: false},
+			{Name: "Root", Depth: 0, UserCount: 0, Active: false, Accessible: true},
+			{Name: "General", Depth: 1, UserCount: 14, Active: true, Accessible: true},
+			{Name: "Support", Depth: 1, UserCount: 2, Active: false, Accessible: true},
+			{Name: "Emergency", Depth: 1, UserCount: 0, Active: false, Accessible: false},
 		},
 		UserCount: 14,
 		Users: []ChannelUser{

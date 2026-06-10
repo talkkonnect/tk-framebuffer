@@ -60,6 +60,6 @@
     <scrollIndicator> </scrollIndicator>
     <footerVersionFormat>talKKonnect %s  Graphics %s</footerVersionFormat>
     <footerCredit>talkkonnect by Suvir Kumar (Released under the MPL License)</footerCredit>
-    <graphicsVersion>1.10</graphicsVersion>
+    <graphicsVersion>1.11</graphicsVersion>
   </captions>
 </UIConfig>
